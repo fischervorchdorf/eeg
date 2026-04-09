@@ -184,8 +184,11 @@ router.post('/stromrechnung', upload.single('file'), async (req, res) => {
             text = await ocrWithClaude(base64, mediaType, claudeKey);
         }
 
+        // Markdown-Codeblock entfernen falls vorhanden (```json ... ```)
+        const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
         // JSON aus Antwort extrahieren
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
             console.error('[OCR] Kein JSON in Antwort:', text.slice(0, 200));
             return res.status(502).json({ error: 'OCR konnte keine Felder extrahieren' });
