@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG Beitritt</title>
+    <link rel="stylesheet" href="/css/onboarding.css">
+</head>
+<body>
+    <div class="bg-overlay"></div>
+
+    <div class="container">
+        <header class="eeg-header" id="eegHeader">
+            <img id="eegLogo" class="eeg-logo" src="" alt="" style="display:none">
+            <h1 id="eegName">Energiegemeinschaft</h1>
+        </header>
+
+        <!-- WIZARD -->
+        <div class="wizard" id="wizard">
+
+            <!-- STEP 1: Mitgliedstyp wählen -->
+            <section class="wizard-step active" data-step="1">
+                <h2>Bitte wähle die passende Beitrittsform:</h2>
+                <p class="step-subtitle">Schön, dass du dich für die Mitgliedschaft in unserer EEG interessierst! Wir freuen uns über jedes neue Mitglied!</p>
+                <div class="type-cards" id="typeCards"></div>
+                <div class="type-info" id="typeInfo"></div>
+            </section>
+
+            <!-- STEP 2: Info-Seite -->
+            <section class="wizard-step" data-step="2">
+                <h2>Bevor du loslegst...</h2>
+                <p class="step-subtitle">Bereite bitte folgende Unterlagen und Informationen vor, da du diese im Verlauf der Registrierung benötigen wirst:</p>
+
+                <div class="info-category">
+                    <h3>Allgemein</h3>
+                    <ul class="checklist">
+                        <li>Ein gültiges Ausweisdokument (Reisepass, Personalausweis, Führerschein)</li>
+                        <li>Aktive E-Mail-Adresse für die Registrierung (und zum Erhalt der Rechnungen)</li>
+                        <li>Bankinformationen (IBAN und Name des Kontoinhabers)</li>
+                        <li>Befugnis, eine SEPA-Lastschrift zu akzeptieren</li>
+                    </ul>
+                </div>
+                <div class="info-category">
+                    <h3>Zählpunkte</h3>
+                    <ul class="checklist">
+                        <li>Zählpunktnummern für Bezug und ggf. Einspeisung (siehe letzte Energieabrechnung)</li>
+                        <li>Rückspeise-Limitierung (falls vom Netzbetreiber vorgeschrieben)</li>
+                        <li>Photovoltaikleistung (oder anderweitige Generatorleistung) für Einspeisezählpunkte</li>
+                        <li>Inventarnummer der betroffenen Zähler</li>
+                    </ul>
+                </div>
+                <div class="info-category">
+                    <h3>Netzbetreiber</h3>
+                    <ul class="checklist">
+                        <li>Zugangsdaten für das Online-Portal des Netzbetreibers (z. B. Netz OÖ, Linz Netz)</li>
+                        <li>Falls vorhanden: Kundennummer beim Netzbetreiber (Achtung: nicht vom Energieversorger!)</li>
+                    </ul>
+                </div>
+                <div class="info-category">
+                    <h3>Energieversorger</h3>
+                    <ul class="checklist">
+                        <li>Rechnung eines Verbraucherzählpunktes (Monats- oder Jahresabrechnung möglich)</li>
+                        <li>Gutschrift eines Lieferzählpunktes (Monats- oder Jahresabrechnung möglich)</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- STEP 3: Persönliche Daten -->
+            <section class="wizard-step" data-step="3">
+                <h2 id="step3Title">Allgemeine Daten</h2>
+                <p class="step-subtitle">Für die Anmeldung benötigen wir ein paar Daten.</p>
+
+                <!-- Firmen-Felder (nur für Unternehmen) -->
+                <div id="companyFields" class="form-section" style="display:none">
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label for="firmenname">Firmenname *</label>
+                            <input type="text" id="firmenname" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="uid_nummer">UID-Nummer *</label>
+                            <input type="text" id="uid_nummer" placeholder="ATU12345678">
+                        </div>
+                        <div class="form-group">
+                            <label for="firmenbuchnummer">Firmenbuchnummer</label>
+                            <input type="text" id="firmenbuchnummer" placeholder="FN 123456a">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-row">
+                        <div class="form-group form-group-sm">
+                            <label for="titel">Titel</label>
+                            <input type="text" id="titel" list="titelListe" placeholder="-">
+                            <datalist id="titelListe">
+                                <option value="Mag.">
+                                <option value="MMag.">
+                                <option value="Dr.">
+                                <option value="DDr.">
+                                <option value="Ing.">
+                                <option value="DI">
+                                <option value="DI (FH)">
+                                <option value="Prof.">
+                                <option value="Univ.-Prof.">
+                                <option value="BSc">
+                                <option value="MSc">
+                                <option value="MBA">
+                                <option value="BA">
+                                <option value="MA">
+                                <option value="Mag. (FH)">
+                                <option value="Dr. med.">
+                                <option value="Dr. jur.">
+                                <option value="Mag. Dr.">
+                                <option value="Mag. phil.">
+                                <option value="Mag. rer. nat.">
+                            </datalist>
+                        </div>
+                        <div class="form-group flex-2">
+                            <label for="vorname">Vorname *</label>
+                            <input type="text" id="vorname" required>
+                        </div>
+                        <div class="form-group flex-2">
+                            <label for="nachname">Nachname *</label>
+                            <input type="text" id="nachname" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="postname">Postname</label>
+                            <input type="text" id="postname" list="postnameListe" placeholder="-">
+                            <datalist id="postnameListe">
+                                <option value="BSc">
+                                <option value="MSc">
+                                <option value="BA">
+                                <option value="MA">
+                                <option value="MBA">
+                                <option value="MAS">
+                                <option value="PhD">
+                                <option value="MEd">
+                                <option value="BEd">
+                                <option value="LL.M.">
+                                <option value="LL.B.">
+                                <option value="BSc (WU)">
+                                <option value="MSc (WU)">
+                                <option value="Bakk.">
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group flex-3">
+                            <label for="strasse">Straße *</label>
+                            <input type="text" id="strasse" required>
+                        </div>
+                        <div class="form-group form-group-sm">
+                            <label for="hausnummer">Nr. *</label>
+                            <input type="text" id="hausnummer" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group form-group-sm">
+                            <label for="plz">PLZ *</label>
+                            <input type="text" id="plz" maxlength="4" required>
+                        </div>
+                        <div class="form-group flex-2">
+                            <label for="ort">Ort *</label>
+                            <input type="text" id="ort" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="ausweis_typ">Identitätsnachweis</label>
+                            <select id="ausweis_typ">
+                                <option value="">-</option>
+                                <option>Reisepass</option>
+                                <option>Personalausweis</option>
+                                <option>Führerschein</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="ausweisnummer">Ausweisnummer</label>
+                            <input type="text" id="ausweisnummer">
+                        </div>
+                        <div class="form-group">
+                            <label for="geburtsdatum">Geburtsdatum *</label>
+                            <input type="date" id="geburtsdatum" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="telefon">Telefonnummer</label>
+                            <input type="tel" id="telefon" placeholder="+43 ...">
+                        </div>
+                        <div class="form-group flex-2">
+                            <label for="email">E-Mail-Adresse *</label>
+                            <input type="email" id="email" required>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- STEP 4: Zählpunkte -->
+            <section class="wizard-step" data-step="4">
+                <h2>Zählpunkte</h2>
+
+                <div class="form-section">
+                    <h3>Zählpunkte (Bezug)</h3>
+                    <p class="step-subtitle">Mit welchen Zählpunkten möchtest du Energie von uns beziehen?</p>
+                    <div id="bezugZaehlpunkte">
+                        <div class="zp-entry" data-idx="0">
+                            <div class="form-row">
+                                <div class="form-group flex-3">
+                                    <label>Zählpunktnummer *</label>
+                                    <input type="text" class="zp-nummer" placeholder="AT 003000 00000000000 00000000000000 00" required>
+                                    <small class="validation-hint"></small>
+                                </div>
+                                <button type="button" class="btn-icon btn-remove-zp" title="Entfernen" style="display:none">&times;</button>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-add" id="addBezugZp">+ Einen Bezugszählpunkt hinzufügen</button>
+                </div>
+
+                <div class="form-section">
+                    <h3>Zählpunkte (Einspeisung)</h3>
+                    <p class="step-subtitle">Erzeugst du selbst erneuerbare Energie und möchtest in unsere EEG einspeisen?</p>
+                    <div id="einspeisungZaehlpunkte"></div>
+                    <button type="button" class="btn-add" id="addEinspeisungZp">+ Einen Einspeisezählpunkt hinzufügen</button>
+                </div>
+
+                <div class="form-section">
+                    <h3>Vorhandene Energiespeicher</h3>
+                    <p class="step-subtitle">Diese Angabe ist freiwillig - wir erheben diese Information nur zu statistischen Zwecken</p>
+                    <div id="energiespeicher"></div>
+                    <button type="button" class="btn-add" id="addSpeicher">+ Einen Energiespeicher hinzufügen</button>
+                </div>
+            </section>
+
+            <!-- STEP 5: Ergänzende Angaben -->
+            <section class="wizard-step" data-step="5">
+                <h2>Ergänzende Angaben</h2>
+                <p class="step-subtitle">Bitte ergänze die Informationen zu den von dir angegebenen Zählpunkten!</p>
+                <div id="zpDetails"></div>
+            </section>
+
+            <!-- STEP 6: Dokumente -->
+            <section class="wizard-step" data-step="6">
+                <h2>Bereitzustellende Unterlagen</h2>
+                <p class="step-subtitle">Bitte stelle uns folgende Unterlage(n) bereit, damit wir deine Teilnahme an unserer EEG besser kalkulieren können:</p>
+
+                <div class="upload-section">
+                    <h3>Rechnung eines Verbraucherzählpunktes (Monats- oder Jahresabrechnung) *</h3>
+                    <div class="upload-area" data-kategorie="rechnung_verbrauch">
+                        <p>Datei zur Übermittlung hier ablegen oder klicken um eine Datei auszuwählen</p>
+                        <input type="file" accept="image/*,application/pdf" class="upload-input">
+                        <div class="upload-preview"></div>
+                    </div>
+                </div>
+
+                <div class="upload-section">
+                    <h3>Gutschrift eines Lieferzählpunktes (falls vorhanden. Monats- oder Jahresabrechnung möglich)</h3>
+                    <div class="upload-area" data-kategorie="gutschrift_einspeisung">
+                        <p>Datei zur Übermittlung hier ablegen oder klicken um eine Datei auszuwählen</p>
+                        <input type="file" accept="image/*,application/pdf" class="upload-input">
+                        <div class="upload-preview"></div>
+                    </div>
+                </div>
+
+                <div class="upload-section">
+                    <h3>Scan eines gültigen Lichtbildausweises (Reisepass, Personalausweis, Führerschein) *</h3>
+                    <div class="upload-area" data-kategorie="lichtbildausweis">
+                        <p>Datei zur Übermittlung hier ablegen oder klicken um eine Datei auszuwählen</p>
+                        <input type="file" accept="image/*,application/pdf" class="upload-input">
+                        <div class="upload-preview"></div>
+                    </div>
+                </div>
+
+                <div class="upload-section">
+                    <h3>Foto eines (oder mehrerer) Zähler - bitte beachte, dass die INV.Nr. gut sichtbar ist.</h3>
+                    <div class="upload-area" data-kategorie="zaehler_foto">
+                        <p>Datei zur Übermittlung hier ablegen oder klicken um eine Datei auszuwählen</p>
+                        <input type="file" accept="image/*,application/pdf" multiple class="upload-input">
+                        <div class="upload-preview"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- STEP 7: Zahlungsinformationen -->
+            <section class="wizard-step" data-step="7">
+                <h2>Zahlungsinformationen</h2>
+                <p class="step-subtitle">Noch ein paar Infos zum Konto, bald ist es geschafft...</p>
+
+                <div class="form-section">
+                    <h3>Kontoinformationen</h3>
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label for="kontoinhaber">Name KontoinhaberIn *</label>
+                            <input type="text" id="kontoinhaber" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label for="iban">IBAN *</label>
+                            <input type="text" id="iban" placeholder="AT00 0000 0000 0000 0000" required>
+                            <small class="validation-hint"></small>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group flex-2">
+                            <label for="bankname">Name der Bank *</label>
+                            <input type="text" id="bankname" required>
+                        </div>
+                    </div>
+
+                    <div class="consent-box">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="sepa_akzeptiert" required>
+                            <span>Hiermit bestätige ich die Richtigkeit der angegebenen Kontoinformationen
+                            und ermächtige die EEG zum Bankeinzug im Rahmen der Leistungsabrechnung.
+                            <br><small>Creditor ID: <span id="creditorId"></span></small></span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- STEP 8: Bestätigungen -->
+            <section class="wizard-step" data-step="8">
+                <h2>Bestätigungen &amp; Freigaben</h2>
+                <p class="step-subtitle">Aus rechtlichen Gründen benötigen wir noch deine formale Zustimmung in den folgenden Bereichen:</p>
+
+                <div class="consent-section">
+                    <h3>Statuten</h3>
+                    <div class="consent-box">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="statuten_akzeptiert" required>
+                            <span>Ich bestätige die Kenntnisnahme der <a href="#" id="statutenLink" target="_blank">Statuten</a> der EEG</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="consent-section">
+                    <h3>AGBs</h3>
+                    <div class="consent-box">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="agb_akzeptiert" required>
+                            <span>Ich bestätige die Kenntnisnahme der <a href="#" id="agbLink" target="_blank">Allgemeinen Geschäftsbedingungen</a> der EEG</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="consent-section">
+                    <h3>Datenschutz</h3>
+                    <div class="consent-box">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="datenschutz_akzeptiert" required>
+                            <span>Ich bestätige die Kenntnisnahme der <a href="#" id="datenschutzLink" target="_blank">Datenschutzerklärung</a> der EEG</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="consent-section">
+                    <h3>Netzbetreibervollmacht</h3>
+                    <div class="consent-box">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="netzbetreiber_vollmacht" required>
+                            <span>Ich erteile der EEG für die Dauer der Mitgliedschaft zeitlich unbegrenzt die Vollmacht,
+                            in meinem Namen sämtliche Schritte und Abstimmungen mit dem zuständigen Netzbetreiber
+                            durchzuführen, die zur vollständigen Aktivierung und Deaktivierung der angeführten
+                            Zählpunkte in der EEG notwendig sind.
+                            Dies betrifft insbesondere auch die Registrierung und Nutzung des eService-Portals des Netzbetreibers.</span>
+                        </label>
+                    </div>
+                    <div class="form-row" style="margin-top:1rem">
+                        <div class="form-group">
+                            <label for="kundennummer_netzbetreiber">Kundennummer beim zuständigen Netzbetreiber</label>
+                            <input type="text" id="kundennummer_netzbetreiber">
+                        </div>
+                        <div class="form-group">
+                            <label for="inventarnummer_zaehler">Inventarnummer eines beliebigen Zählers</label>
+                            <input type="text" id="inventarnummer_zaehler" placeholder="XXX.XXX.XXX">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- STEP 9: Freiwillige Angaben -->
+            <section class="wizard-step" data-step="9">
+                <h2>Freiwillige Angaben</h2>
+                <p class="step-subtitle">Diese Daten sind wichtig, damit wir die Energieflüsse in unserer EEG langfristig optimieren können.</p>
+
+                <div class="form-section">
+                    <h3>E-Auto(s)</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="eauto_anzahl">Anzahl der E-Autos im Haushalt</label>
+                            <select id="eauto_anzahl">
+                                <option value="">-</option>
+                                <option>0</option><option>1</option><option>2</option><option>3</option><option>4+</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="eauto_batteriekapazitaet">Batteriekapazität der Kfz in kWh</label>
+                            <input type="number" id="eauto_batteriekapazitaet" placeholder="(Bitte Gesamtsumme aller Kfz angeben)">
+                        </div>
+                        <div class="form-group">
+                            <label for="eauto_jahreskilometer">Jahreskilometer der Kfz</label>
+                            <input type="number" id="eauto_jahreskilometer" placeholder="(Bitte Gesamtsumme aller Kfz angeben)">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h3>Warmwasser</h3>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="warmwasser_typ">Wie bereitest du Warmwasser im Sommer?</label>
+                            <select id="warmwasser_typ" onchange="document.getElementById('warmwasser_sonstige_group').style.display = this.value === '__sonstiges' ? 'block' : 'none'">
+                                <option value="">-</option>
+                                <option>Heizstab/Boiler</option>
+                                <option>Wärmepumpe</option>
+                                <option>Solarthermie</option>
+                                <option>Fernwärme</option>
+                                <option value="__sonstiges">Sonstige</option>
+                            </select>
+                        </div>
+                        <div class="form-group" id="warmwasser_sonstige_group" style="display:none">
+                            <label for="warmwasser_sonstige">Bitte angeben</label>
+                            <input type="text" id="warmwasser_sonstige" placeholder="Welche Art der Warmwasserbereitung?">
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- STEP 10: Abschluss -->
+            <section class="wizard-step" data-step="10">
+                <h2>Vielen Dank für deine Anmeldung!</h2>
+                <p>Deine Daten werden schnellstmöglich überprüft und in unser System übernommen.</p>
+                <p>Sobald das Datum feststeht, ab dem du erneuerbare Energie aus unserer Gemeinschaft beziehen wirst, kontaktieren wir dich umgehend.</p>
+                <p>Solltest du Fragen haben, stehen wir dir selbstverständlich gerne zur Verfügung.</p>
+
+                <div class="passphrase-box" id="passphraseBox" style="display:none">
+                    <h3>Dein Passwort:</h3>
+                    <div class="passphrase" id="passphraseDisplay"></div>
+                    <p>Du kannst dieses Passwort nutzen, um jederzeit den Bearbeitungsfortschritt deines Antrages einzusehen
+                    und natürlich um deine Daten zu ändern.</p>
+                    <p><strong>Bitte bewahre es gut auf!</strong></p>
+                </div>
+            </section>
+
+        </div>
+
+        <!-- Navigation Bar (Bottom) -->
+        <nav class="wizard-nav" id="wizardNav">
+            <button type="button" class="btn btn-back" id="btnBack" style="display:none">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="15 18 9 12 15 6"/>
+                </svg>
+            </button>
+            <button type="button" class="btn btn-primary" id="btnNext">Weiter zum nächsten Schritt</button>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+                <span class="progress-text" id="progressText">0%</span>
+            </div>
+        </nav>
+    </div>
+
+    <footer class="eeg-footer">
+        <a href="#" onclick="event.preventDefault();document.getElementById('impressumModal').style.display='flex'" class="footer-link">Impressum</a>
+        <p>Powered by <strong>EEG-Portal</strong> &mdash; Software &copy; Mag. Martin Fischer</p>
+    </footer>
+
+    <!-- Impressum Modal -->
+    <div class="impressum-overlay" id="impressumModal" style="display:none">
+        <div class="impressum-box">
+            <button class="impressum-close" onclick="document.getElementById('impressumModal').style.display='none'">&times;</button>
+            <h2>Impressum</h2>
+            <h3 id="impName2"></h3>
+            <div class="impressum-grid">
+                <div>
+                    <h4>Adresse</h4>
+                    <p id="impSitz2"></p>
+                </div>
+                <div>
+                    <h4>Vereinsregister</h4>
+                    <p id="impZvr2"></p>
+                </div>
+                <div>
+                    <h4>Kontakt</h4>
+                    <p id="impKontakt2"></p>
+                </div>
+            </div>
+            <hr>
+            <div class="impressum-software">
+                <h4>Software</h4>
+                <p>EEG-Portal Onboarding-Plattform<br>
+                &copy; Mag. Martin Fischer<br>
+                Alle Rechte vorbehalten.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/js/validators.js"></script>
+    <script src="/js/onboarding-api.js"></script>
+    <script src="/js/file-upload.js"></script>
+    <script src="/js/onboarding-app.js"></script>
+</body>
+</html>

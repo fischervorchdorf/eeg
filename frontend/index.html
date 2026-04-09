@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG Onboarding</title>
+    <link rel="stylesheet" href="/css/onboarding.css">
+</head>
+<body>
+    <div class="bg-overlay"></div>
+
+    <div class="container">
+        <header class="eeg-header" id="eegHeader">
+            <img id="eegLogo" class="eeg-logo" src="" alt="" style="display:none">
+            <h1 id="eegName">Energiegemeinschaft</h1>
+            <p id="eegSitz" class="eeg-subtitle"></p>
+        </header>
+
+        <main class="landing-content">
+            <p class="landing-intro">Womit können wir dir helfen?</p>
+
+            <div class="landing-cards">
+                <a href="/onboarding" class="landing-card" id="btnJoin">
+                    <div class="landing-card-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <line x1="19" y1="8" x2="19" y2="14"/>
+                            <line x1="22" y1="11" x2="16" y2="11"/>
+                        </svg>
+                    </div>
+                    <span>Ich möchte dieser EEG beitreten</span>
+                </a>
+
+                <a href="/status" class="landing-card">
+                    <div class="landing-card-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                        </svg>
+                    </div>
+                    <span>Ich möchte meine Daten abrufen</span>
+                </a>
+            </div>
+        </main>
+
+        <footer class="eeg-footer">
+            <a href="#" id="btnImpressum" class="footer-link">Impressum</a>
+            <p>Powered by <strong>EEG-Portal</strong> &mdash; Software &copy; Mag. Martin Fischer</p>
+        </footer>
+
+        <!-- Impressum Modal -->
+        <div class="impressum-overlay" id="impressumModal" style="display:none">
+            <div class="impressum-box">
+                <button class="impressum-close" onclick="document.getElementById('impressumModal').style.display='none'">&times;</button>
+                <h2>Impressum</h2>
+                <h3 id="impName"></h3>
+                <div class="impressum-grid">
+                    <div>
+                        <h4>Adresse</h4>
+                        <p id="impSitz"></p>
+                    </div>
+                    <div>
+                        <h4>Vereinsregister</h4>
+                        <p id="impZvr"></p>
+                    </div>
+                    <div>
+                        <h4>Kontakt</h4>
+                        <p id="impKontakt"></p>
+                    </div>
+                </div>
+                <hr>
+                <div class="impressum-software">
+                    <h4>Software</h4>
+                    <p>EEG-Portal Onboarding-Plattform<br>
+                    &copy; Mag. Martin Fischer<br>
+                    Alle Rechte vorbehalten.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // EEG-Slug aus URL oder Query-Parameter laden
+        const urlParams = new URLSearchParams(window.location.search);
+        let eegSlug = urlParams.get('eeg');
+
+        // Subdomain-Erkennung
+        if (!eegSlug) {
+            const parts = window.location.hostname.split('.');
+            if (parts.length >= 3 && parts[0] !== 'www') {
+                eegSlug = parts[0];
+            }
+        }
+
+        if (eegSlug) {
+            fetch(`/api/onboarding/eeg/${eegSlug}`)
+                .then(r => r.json())
+                .then(eeg => {
+                    if (eeg.error) return;
+                    document.getElementById('eegName').textContent = eeg.name;
+                    document.getElementById('eegSitz').textContent = eeg.sitz || '';
+                    document.title = `${eeg.name} - Onboarding`;
+
+                    if (eeg.logo_url) {
+                        const logo = document.getElementById('eegLogo');
+                        logo.src = eeg.logo_url;
+                        logo.alt = eeg.name;
+                        logo.style.display = 'block';
+                    }
+
+                    // Branding-Farben anwenden
+                    if (eeg.farbe_primary) document.documentElement.style.setProperty('--primary', eeg.farbe_primary);
+                    if (eeg.farbe_secondary) document.documentElement.style.setProperty('--secondary', eeg.farbe_secondary);
+                    if (eeg.background_url) document.body.style.backgroundImage = `url(${eeg.background_url})`;
+
+                    // EEG-ID in Links weitergeben
+                    document.getElementById('btnJoin').href = `/onboarding?eeg=${eegSlug}`;
+
+                    // In localStorage speichern
+                    localStorage.setItem('eeg_config', JSON.stringify(eeg));
+
+                    // Impressum befüllen
+                    document.getElementById('impName').textContent = eeg.name;
+                    document.getElementById('impSitz').textContent = eeg.sitz || '-';
+                    document.getElementById('impZvr').textContent = eeg.zvr_nummer ? 'ZVR ' + eeg.zvr_nummer : '-';
+                    document.getElementById('impKontakt').textContent = eeg.kontakt_email || '-';
+                })
+                .catch(() => {});
+        }
+        // Impressum öffnen
+        document.getElementById('btnImpressum').addEventListener('click', (e) => {
+            e.preventDefault();
+            document.getElementById('impressumModal').style.display = 'flex';
+        });
+    </script>
+</body>
+</html>

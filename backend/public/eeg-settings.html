@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Einstellungen - EEG Admin</title>
+    <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/></svg><span>EEG-Portal</span></div>
+        <ul class="sidebar-nav">
+            <li><a href="/admin/dashboard.html">Dashboard</a></li>
+            <li><a href="/admin/applications.html">Antrage</a></li>
+            <li><a href="/admin/members.html">Mitglieder</a></li>
+            <li><a href="/admin/export.html">Export</a></li>
+            <li class="active"><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+        </ul>
+        <div class="sidebar-footer"><span id="adminName"></span><button class="btn-logout" id="btnLogout">Abmelden</button></div>
+    </nav>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>EEG-Einstellungen</h1>
+            <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
+        </div>
+
+        <form id="settingsForm" class="settings-form">
+            <div class="card">
+                <h3>Allgemein</h3>
+                <div class="form-row">
+                    <div class="form-group flex-2"><label>Name der EEG</label><input type="text" id="sName"></div>
+                    <div class="form-group"><label>ZVR-Nummer</label><input type="text" id="sZvr"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group flex-2"><label>Sitz</label><input type="text" id="sSitz"></div>
+                    <div class="form-group"><label>Kontakt-E-Mail</label><input type="email" id="sEmail"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>SEPA Creditor-ID</label><input type="text" id="sCreditor"></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:1.5rem">
+                <h3>Preise &amp; Gebuehren</h3>
+                <div class="form-row">
+                    <div class="form-group"><label>Eintrittsbeitrag (Cent)</label><input type="number" id="sBeitrag"></div>
+                    <div class="form-group"><label>Zusatz-Zaehlpunkt (Cent)</label><input type="number" id="sZusatzZp"></div>
+                    <div class="form-group"><label>MwSt.-Satz (%)</label><input type="number" id="sMwst" step="0.01"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>Preis Erzeugung (Cent/kWh)</label><input type="number" id="sErzeugung"></div>
+                    <div class="form-group"><label>Preis Verbrauch (Cent/kWh)</label><input type="number" id="sVerbrauch"></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:1.5rem">
+                <h3>Branding</h3>
+                <div class="form-row">
+                    <div class="form-group"><label>Primaerfarbe</label><input type="color" id="sColorPrimary"></div>
+                    <div class="form-group"><label>Sekundaerfarbe</label><input type="color" id="sColorSecondary"></div>
+                </div>
+            </div>
+
+            <div class="card" style="margin-top:1.5rem">
+                <h3>Dokumente (PDF)</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Statuten</label>
+                        <input type="file" id="fileStatuten" accept="application/pdf">
+                        <a id="linkStatuten" href="#" target="_blank" style="display:none">Aktuelle Datei</a>
+                    </div>
+                    <div class="form-group">
+                        <label>AGB</label>
+                        <input type="file" id="fileAgb" accept="application/pdf">
+                        <a id="linkAgb" href="#" target="_blank" style="display:none">Aktuelle Datei</a>
+                    </div>
+                    <div class="form-group">
+                        <label>Datenschutzerklaerung</label>
+                        <input type="file" id="fileDatenschutz" accept="application/pdf">
+                        <a id="linkDatenschutz" href="#" target="_blank" style="display:none">Aktuelle Datei</a>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Logo</label>
+                        <input type="file" id="fileLogo" accept="image/*">
+                    </div>
+                    <div class="form-group">
+                        <label>Hintergrundbild</label>
+                        <input type="file" id="fileBackground" accept="image/*">
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="margin-top:1.5rem">Einstellungen speichern</button>
+            <p id="saveMsg" class="success-text" style="display:none">Gespeichert!</p>
+        </form>
+    </main>
+
+    <script>
+        async function loadSettings() {
+            const auth = await fetch('/api/auth/me').then(r=>r.json());
+            if (!auth.id) { window.location.href = '/admin/'; return; }
+            document.getElementById('adminName').textContent = auth.username;
+
+            const res = await fetch('/api/admin/eeg/settings');
+            const s = await res.json();
+            if (s.error) return;
+
+            document.getElementById('sName').value = s.name || '';
+            document.getElementById('sZvr').value = s.zvr_nummer || '';
+            document.getElementById('sSitz').value = s.sitz || '';
+            document.getElementById('sEmail').value = s.kontakt_email || '';
+            document.getElementById('sCreditor').value = s.creditor_id || '';
+            document.getElementById('sBeitrag').value = s.eintrittsbeitrag_ct || 2500;
+            document.getElementById('sZusatzZp').value = s.zusatz_zaehlpunkt_ct || 1000;
+            document.getElementById('sMwst').value = s.mwst_satz || 20;
+            document.getElementById('sErzeugung').value = s.preis_erzeugung_ct || 1100;
+            document.getElementById('sVerbrauch').value = s.preis_verbrauch_ct || 1200;
+            document.getElementById('sColorPrimary').value = s.farbe_primary || '#1a73e8';
+            document.getElementById('sColorSecondary').value = s.farbe_secondary || '#00a86b';
+
+            if (s.statuten_url) { const l = document.getElementById('linkStatuten'); l.href = s.statuten_url; l.style.display = 'inline'; }
+            if (s.agb_url) { const l = document.getElementById('linkAgb'); l.href = s.agb_url; l.style.display = 'inline'; }
+            if (s.datenschutz_url) { const l = document.getElementById('linkDatenschutz'); l.href = s.datenschutz_url; l.style.display = 'inline'; }
+        }
+
+        document.getElementById('settingsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Einstellungen speichern
+            await fetch('/api/admin/eeg/settings', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name: document.getElementById('sName').value,
+                    zvr_nummer: document.getElementById('sZvr').value,
+                    sitz: document.getElementById('sSitz').value,
+                    kontakt_email: document.getElementById('sEmail').value,
+                    creditor_id: document.getElementById('sCreditor').value,
+                    eintrittsbeitrag_ct: parseInt(document.getElementById('sBeitrag').value),
+                    zusatz_zaehlpunkt_ct: parseInt(document.getElementById('sZusatzZp').value),
+                    mwst_satz: parseFloat(document.getElementById('sMwst').value),
+                    preis_erzeugung_ct: parseInt(document.getElementById('sErzeugung').value),
+                    preis_verbrauch_ct: parseInt(document.getElementById('sVerbrauch').value),
+                    farbe_primary: document.getElementById('sColorPrimary').value,
+                    farbe_secondary: document.getElementById('sColorSecondary').value
+                })
+            });
+
+            // Dateien hochladen
+            const uploads = [
+                ['statuten', 'fileStatuten'], ['agb', 'fileAgb'], ['datenschutz', 'fileDatenschutz'],
+                ['logo', 'fileLogo'], ['background', 'fileBackground']
+            ];
+
+            for (const [typ, inputId] of uploads) {
+                const input = document.getElementById(inputId);
+                if (input.files.length > 0) {
+                    const fd = new FormData();
+                    fd.append('file', input.files[0]);
+                    await fetch(`/api/admin/eeg/dokument/${typ}`, { method: 'POST', body: fd });
+                }
+            }
+
+            const msg = document.getElementById('saveMsg');
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+        });
+
+        document.getElementById('btnLogout').addEventListener('click', async()=>{await fetch('/api/auth/logout',{method:'POST'});window.location.href='/admin/';});
+        document.getElementById('btnToggleSidebar')?.addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
+        loadSettings();
+    </script>
+</body>
+</html>

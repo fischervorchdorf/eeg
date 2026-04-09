@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export - EEG Admin</title>
+    <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/></svg><span>EEG-Portal</span></div>
+        <ul class="sidebar-nav">
+            <li><a href="/admin/dashboard.html">Dashboard</a></li>
+            <li><a href="/admin/applications.html">Antrage</a></li>
+            <li><a href="/admin/members.html">Mitglieder</a></li>
+            <li class="active"><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+        </ul>
+        <div class="sidebar-footer"><span id="adminName"></span><button class="btn-logout" id="btnLogout">Abmelden</button></div>
+    </nav>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Daten-Export</h1>
+            <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
+        </div>
+
+        <div class="card">
+            <h3>Mitglieder-Export (Excel)</h3>
+            <p>Exportiert alle aktiven Mitglieder als .xlsx Datei.</p>
+            <div class="export-options">
+                <label><input type="checkbox" value="eingereicht" class="export-status"> Auch eingereichte Antrage</label>
+            </div>
+            <a class="btn btn-primary" id="btnExportMembers" href="/api/admin/export/members" download>Excel herunterladen</a>
+        </div>
+
+        <div class="card" style="margin-top:1.5rem">
+            <h3>Digi-Taler Export</h3>
+            <p>Exportiert Mitgliederdaten fuer die Regions.app / Digi-Taler Integration.</p>
+            <a class="btn btn-secondary" href="/api/admin/export/digi-taler" download>Digi-Taler Excel herunterladen</a>
+        </div>
+    </main>
+
+    <script>
+        fetch('/api/auth/me').then(r=>r.json()).then(d=>{if(!d.id)window.location.href='/admin/';document.getElementById('adminName').textContent=d.username;}).catch(()=>window.location.href='/admin/');
+        document.getElementById('btnLogout').addEventListener('click', async()=>{await fetch('/api/auth/logout',{method:'POST'});window.location.href='/admin/';});
+        document.getElementById('btnToggleSidebar')?.addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
+    </script>
+</body>
+</html>

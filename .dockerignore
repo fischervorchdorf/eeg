@@ -1,0 +1,11 @@
+node_modules
+npm-debug.log
+.env
+backend/.env
+backend/uploads/*
+!backend/uploads/.gitkeep
+.git
+.gitignore
+.DS_Store
+*.pdf
+*.log

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antrage - EEG Admin</title>
+    <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+            <span>EEG-Portal</span>
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/admin/dashboard.html">Dashboard</a></li>
+            <li class="active"><a href="/admin/applications.html">Antrage</a></li>
+            <li><a href="/admin/members.html">Mitglieder</a></li>
+            <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span id="adminName"></span>
+            <button class="btn-logout" id="btnLogout">Abmelden</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Antrage</h1>
+            <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
+        </div>
+
+        <!-- Filter -->
+        <div class="toolbar">
+            <input type="text" id="searchInput" placeholder="Suche (Name, E-Mail...)" class="toolbar-search">
+            <select id="statusFilter" class="toolbar-select">
+                <option value="">Alle Status</option>
+                <option value="eingereicht">Eingereicht</option>
+                <option value="in_pruefung">In Pruefung</option>
+                <option value="genehmigt">Genehmigt</option>
+                <option value="abgelehnt">Abgelehnt</option>
+                <option value="aktiv">Aktiv</option>
+                <option value="entwurf">Entwurf</option>
+            </select>
+            <span id="resultCount" class="toolbar-count"></span>
+        </div>
+
+        <!-- Tabelle -->
+        <div class="table-container">
+            <table class="data-table" id="appTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Typ</th>
+                        <th>E-Mail</th>
+                        <th>Ort</th>
+                        <th>ZP</th>
+                        <th>Status</th>
+                        <th>Eingereicht</th>
+                        <th>Aktion</th>
+                    </tr>
+                </thead>
+                <tbody id="appTableBody"></tbody>
+            </table>
+        </div>
+
+        <!-- Detail-Modal -->
+        <div class="modal-overlay" id="detailModal" style="display:none">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2 id="modalTitle">Antrag Details</h2>
+                    <button class="modal-close" id="modalClose">&times;</button>
+                </div>
+                <div class="modal-body" id="modalBody"></div>
+                <div class="modal-footer" id="modalFooter"></div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let allApplications = [];
+
+        async function checkAuth() {
+            const res = await fetch('/api/auth/me');
+            const data = await res.json();
+            if (!data.id) { window.location.href = '/admin/'; return null; }
+            document.getElementById('adminName').textContent = data.username;
+            return data;
+        }
+
+        async function loadApplications() {
+            const status = document.getElementById('statusFilter').value;
+            const search = document.getElementById('searchInput').value;
+            let url = '/api/admin/applications?limit=200';
+            if (status) url += `&status=${status}`;
+            if (search) url += `&search=${encodeURIComponent(search)}`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+            allApplications = data.applications || [];
+            document.getElementById('resultCount').textContent = `${data.total || 0} Ergebnisse`;
+            renderTable();
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('appTableBody');
+            const statusColors = {
+                entwurf: 'muted', eingereicht: 'warning', in_pruefung: 'info',
+                genehmigt: 'success', abgelehnt: 'danger', aktiv: 'primary', gekuendigt: 'muted'
+            };
+
+            tbody.innerHTML = allApplications.map(a => `
+                <tr>
+                    <td><strong>${a.firmenname || `${a.vorname || ''} ${a.nachname || ''}`}</strong></td>
+                    <td>${a.member_type}</td>
+                    <td>${a.email || '-'}</td>
+                    <td>${a.plz || ''} ${a.ort || ''}</td>
+                    <td>${a.zp_count || 0}</td>
+                    <td><span class="badge badge-${statusColors[a.status] || 'muted'}">${a.status}</span></td>
+                    <td>${a.eingereicht_am ? new Date(a.eingereicht_am).toLocaleDateString('de-AT') : '-'}</td>
+                    <td><button class="btn btn-sm" onclick="showDetail(${a.id})">Details</button></td>
+                </tr>
+            `).join('');
+        }
+
+        async function showDetail(id) {
+            const res = await fetch(`/api/admin/applications/${id}`);
+            const data = await res.json();
+            const app = data.application;
+
+            document.getElementById('modalTitle').textContent =
+                `${app.firmenname || `${app.vorname} ${app.nachname}`} (${app.member_type})`;
+
+            document.getElementById('modalBody').innerHTML = `
+                <div class="detail-grid">
+                    <div class="detail-section">
+                        <h4>Persoenliche Daten</h4>
+                        <p>${app.titel || ''} ${app.vorname} ${app.nachname} ${app.postname || ''}</p>
+                        <p>${app.strasse} ${app.hausnummer}, ${app.plz} ${app.ort}</p>
+                        <p>E-Mail: ${app.email || '-'}</p>
+                        <p>Telefon: ${app.telefon || '-'}</p>
+                        <p>Geburtsdatum: ${app.geburtsdatum ? new Date(app.geburtsdatum).toLocaleDateString('de-AT') : '-'}</p>
+                        ${app.firmenname ? `<p>Firma: ${app.firmenname} | UID: ${app.uid_nummer || '-'}</p>` : ''}
+                    </div>
+                    <div class="detail-section">
+                        <h4>Zahlung</h4>
+                        <p>Kontoinhaber: ${app.kontoinhaber || '-'}</p>
+                        <p>IBAN: ${app.iban || '-'}</p>
+                        <p>Bank: ${app.bankname || '-'}</p>
+                        <p>SEPA: ${app.sepa_akzeptiert ? 'Ja' : 'Nein'}</p>
+                    </div>
+                    <div class="detail-section">
+                        <h4>Zaehlpunkte (${data.zaehlpunkte?.length || 0})</h4>
+                        ${(data.zaehlpunkte || []).map(z => `
+                            <p><span class="badge badge-${z.typ === 'bezug' ? 'info' : 'success'}">${z.typ}</span>
+                            ${z.zaehlpunktnummer} ${z.teilnahmefaktor ? `(${z.teilnahmefaktor}%)` : ''}</p>
+                        `).join('')}
+                    </div>
+                    <div class="detail-section">
+                        <h4>Dokumente (${data.documents?.length || 0})</h4>
+                        ${(data.documents || []).map(d => `
+                            <p><a href="${d.s3_url || d.local_path}" target="_blank">${d.original_name}</a> (${d.kategorie})</p>
+                        `).join('') || '<p>Keine Dokumente</p>'}
+                    </div>
+                    <div class="detail-section">
+                        <h4>Bestaetigungen</h4>
+                        <p>Statuten: ${app.statuten_akzeptiert ? '&#10003;' : '&#10007;'} |
+                           AGB: ${app.agb_akzeptiert ? '&#10003;' : '&#10007;'} |
+                           Datenschutz: ${app.datenschutz_akzeptiert ? '&#10003;' : '&#10007;'} |
+                           Vollmacht: ${app.netzbetreiber_vollmacht ? '&#10003;' : '&#10007;'}</p>
+                    </div>
+                    <div class="detail-section">
+                        <h4>Admin-Notiz</h4>
+                        <textarea id="adminNotiz" class="admin-notiz" rows="3">${app.admin_notiz || ''}</textarea>
+                    </div>
+                </div>
+            `;
+
+            const validNext = {
+                eingereicht: ['in_pruefung', 'genehmigt', 'abgelehnt'],
+                in_pruefung: ['genehmigt', 'abgelehnt'],
+                genehmigt: ['aktiv'],
+                abgelehnt: ['eingereicht'],
+                aktiv: ['gekuendigt']
+            };
+            const actions = validNext[app.status] || [];
+
+            document.getElementById('modalFooter').innerHTML = `
+                <div class="modal-actions">
+                    <button class="btn btn-sm" onclick="saveNotiz(${app.id})">Notiz speichern</button>
+                    ${actions.map(s => `<button class="btn btn-sm btn-${s === 'genehmigt' || s === 'aktiv' ? 'success' : s === 'abgelehnt' ? 'danger' : 'primary'}" onclick="changeStatus(${app.id}, '${s}')">${s}</button>`).join('')}
+                </div>
+            `;
+
+            document.getElementById('detailModal').style.display = 'flex';
+        }
+
+        async function changeStatus(id, status) {
+            const notiz = document.getElementById('adminNotiz')?.value;
+            await fetch(`/api/admin/applications/${id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status, admin_notiz: notiz })
+            });
+            document.getElementById('detailModal').style.display = 'none';
+            loadApplications();
+        }
+
+        async function saveNotiz(id) {
+            const notiz = document.getElementById('adminNotiz')?.value;
+            await fetch(`/api/admin/applications/${id}/notiz`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ admin_notiz: notiz })
+            });
+            alert('Gespeichert');
+        }
+
+        document.getElementById('modalClose').addEventListener('click', () => {
+            document.getElementById('detailModal').style.display = 'none';
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', loadApplications);
+        document.getElementById('searchInput').addEventListener('input', debounce(loadApplications, 300));
+        document.getElementById('btnLogout').addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/admin/';
+        });
+        document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('open');
+        });
+
+        function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+
+        checkAuth().then(u => { if (u) loadApplications(); });
+    </script>
+</body>
+</html>

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Super-Admin - EEG Portal</title>
+    <link rel="stylesheet" href="/admin/css/admin.css">
+    <style>
+        .tab-bar { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; }
+        .tab-bar button { padding: 0.75rem 1.5rem; border: none; background: none; font-size: 0.95rem; font-weight: 500; color: var(--text-muted); cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.2s; }
+        .tab-bar button.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .tab-bar button:hover { color: var(--text); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .eeg-card { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem; transition: all 0.2s; }
+        .eeg-card:hover { box-shadow: var(--shadow-lg); }
+        .eeg-card-info h3 { font-size: 1.05rem; margin-bottom: 0.25rem; }
+        .eeg-card-info p { font-size: 0.85rem; color: var(--text-muted); }
+        .eeg-card-stats { display: flex; gap: 1.5rem; align-items: center; }
+        .eeg-card-stat { text-align: center; }
+        .eeg-card-stat .num { font-size: 1.3rem; font-weight: 700; color: var(--primary); }
+        .eeg-card-stat .label { font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase; }
+        .eeg-card-actions { display: flex; gap: 0.5rem; }
+        .eeg-inactive { opacity: 0.5; }
+        .form-modal { max-width: 600px; }
+        .form-modal .form-row { display: flex; gap: 1rem; margin-bottom: 0.75rem; flex-wrap: wrap; }
+        .form-modal .form-group { flex: 1; min-width: 200px; }
+        .form-modal label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.3rem; }
+        .form-modal input, .form-modal select { width: 100%; padding: 0.6rem 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; }
+        .form-modal input:focus, .form-modal select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(26,115,232,0.1); }
+        .perm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin: 0.75rem 0; }
+        .perm-grid label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
+        .slug-preview { font-size: 0.8rem; color: var(--primary); margin-top: 0.25rem; }
+    </style>
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/></svg>
+            <span>EEG-Portal</span>
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/admin/dashboard.html">Dashboard</a></li>
+            <li><a href="/admin/applications.html">Anträge</a></li>
+            <li><a href="/admin/members.html">Mitglieder</a></li>
+            <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+            <li class="active"><a href="/admin/super-admin.html">Super-Admin</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span id="adminName"></span>
+            <button class="btn-logout" id="btnLogout">Abmelden</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Super-Admin Verwaltung</h1>
+            <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tab-bar">
+            <button class="active" data-tab="eegs">Energiegemeinschaften</button>
+            <button data-tab="users">Admin-Benutzer</button>
+            <button data-tab="audit">Audit-Log</button>
+        </div>
+
+        <!-- TAB: EEGs -->
+        <div class="tab-content active" id="tab-eegs">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+                <p id="eegCount" class="text-muted"></p>
+                <button class="btn btn-primary" id="btnNewEeg">+ Neue EEG anlegen</button>
+            </div>
+            <div id="eegList"></div>
+        </div>
+
+        <!-- TAB: Users -->
+        <div class="tab-content" id="tab-users">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem">
+                <p id="userCount" class="text-muted"></p>
+                <button class="btn btn-primary" id="btnNewUser">+ Neuen Admin anlegen</button>
+            </div>
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Benutzername</th>
+                            <th>E-Mail</th>
+                            <th>Rolle</th>
+                            <th>EEG</th>
+                            <th>Berechtigungen</th>
+                            <th>Letzter Login</th>
+                            <th>Aktiv</th>
+                            <th>Aktion</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: Audit -->
+        <div class="tab-content" id="tab-audit">
+            <div class="table-container">
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Zeitpunkt</th><th>Benutzer</th><th>Aktion</th><th>Details</th><th>IP</th></tr>
+                    </thead>
+                    <tbody id="auditBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Modal: Neue EEG -->
+        <div class="modal-overlay" id="eegModal" style="display:none">
+            <div class="modal form-modal">
+                <div class="modal-header">
+                    <h2 id="eegModalTitle">Neue EEG anlegen</h2>
+                    <button class="modal-close" onclick="document.getElementById('eegModal').style.display='none'">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="eegEditId">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Name der EEG *</label>
+                            <input type="text" id="eegName" placeholder="z.B. Bürgerenergiegemeinschaft Laudachtal">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Slug (für URL) *</label>
+                            <input type="text" id="eegSlug" placeholder="z.B. laudachtal">
+                            <div class="slug-preview" id="slugPreview"></div>
+                        </div>
+                        <div class="form-group">
+                            <label>Custom Domain (optional)</label>
+                            <input type="text" id="eegDomain" placeholder="z.B. beitritt.eeg-laudachtal.at">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Sitz</label>
+                            <input type="text" id="eegSitz" placeholder="z.B. 4655 Vorchdorf, Hauptstraße 1">
+                        </div>
+                        <div class="form-group">
+                            <label>ZVR-Nummer</label>
+                            <input type="text" id="eegZvr" placeholder="z.B. 1446617102">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Kontakt-E-Mail</label>
+                            <input type="email" id="eegEmail" placeholder="kontakt@eeg.at">
+                        </div>
+                        <div class="form-group">
+                            <label>SEPA Creditor-ID</label>
+                            <input type="text" id="eegCreditor" placeholder="AT32ZZZ...">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="btnSaveEeg">Speichern</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Neuer User -->
+        <div class="modal-overlay" id="userModal" style="display:none">
+            <div class="modal form-modal">
+                <div class="modal-header">
+                    <h2 id="userModalTitle">Neuen Admin anlegen</h2>
+                    <button class="modal-close" onclick="document.getElementById('userModal').style.display='none'">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="userEditId">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Benutzername *</label>
+                            <input type="text" id="userName" placeholder="z.B. admin-laudachtal">
+                        </div>
+                        <div class="form-group">
+                            <label>E-Mail *</label>
+                            <input type="email" id="userEmail" placeholder="admin@eeg.at">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Passwort *</label>
+                            <input type="password" id="userPassword" placeholder="Min. 8 Zeichen">
+                        </div>
+                        <div class="form-group">
+                            <label>Rolle</label>
+                            <select id="userRolle">
+                                <option value="eeg_admin">EEG-Admin</option>
+                                <option value="super_admin">Super-Admin</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Zugewiesene EEG</label>
+                            <select id="userEeg"><option value="">-- Keine (Super-Admin) --</option></select>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:0.82rem;font-weight:600;color:var(--text-muted)">Berechtigungen</label>
+                        <div class="perm-grid">
+                            <label><input type="checkbox" id="permAntraege" checked> Anträge verwalten</label>
+                            <label><input type="checkbox" id="permMitglieder" checked> Mitglieder verwalten</label>
+                            <label><input type="checkbox" id="permExport" checked> Export</label>
+                            <label><input type="checkbox" id="permEinstellungen" checked> Einstellungen</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" id="btnSaveUser">Speichern</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let allEegs = [];
+        let allUsers = [];
+
+        // --- AUTH ---
+        async function checkAuth() {
+            const res = await fetch('/api/auth/me');
+            const data = await res.json();
+            if (!data.id || data.rolle !== 'super_admin') {
+                alert('Nur für Super-Admins zugänglich');
+                window.location.href = '/admin/dashboard.html';
+                return null;
+            }
+            document.getElementById('adminName').textContent = data.username;
+            return data;
+        }
+
+        // --- TABS ---
+        document.querySelectorAll('.tab-bar button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-bar button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+
+                if (btn.dataset.tab === 'users') loadUsers();
+                if (btn.dataset.tab === 'audit') loadAudit();
+            });
+        });
+
+        // --- EEGs ---
+        async function loadEegs() {
+            const res = await fetch('/api/super-admin/eegs');
+            allEegs = await res.json();
+            document.getElementById('eegCount').textContent = `${allEegs.length} Energiegemeinschaft(en)`;
+
+            document.getElementById('eegList').innerHTML = allEegs.map(e => `
+                <div class="eeg-card ${e.aktiv ? '' : 'eeg-inactive'}">
+                    <div class="eeg-card-info">
+                        <h3>${e.name}</h3>
+                        <p>${e.slug}.eeg-portal.at ${e.domain ? '| ' + e.domain : ''} ${e.sitz ? '| ' + e.sitz : ''}</p>
+                        <p style="font-size:0.8rem;color:var(--text-light)">ZVR: ${e.zvr_nummer || '-'} | Creditor: ${e.creditor_id || '-'}</p>
+                    </div>
+                    <div class="eeg-card-stats">
+                        <div class="eeg-card-stat">
+                            <div class="num">${e.mitglieder || 0}</div>
+                            <div class="label">Mitglieder</div>
+                        </div>
+                        <div class="eeg-card-stat">
+                            <div class="num">${e.offene_antraege || 0}</div>
+                            <div class="label">Offen</div>
+                        </div>
+                        <div class="eeg-card-actions">
+                            <button class="btn btn-sm" onclick="editEeg(${e.id})">Bearbeiten</button>
+                            <button class="btn btn-sm ${e.aktiv ? 'btn-danger' : 'btn-success'}" onclick="toggleEeg(${e.id})">
+                                ${e.aktiv ? 'Deaktivieren' : 'Aktivieren'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        document.getElementById('btnNewEeg').addEventListener('click', () => {
+            document.getElementById('eegEditId').value = '';
+            document.getElementById('eegName').value = '';
+            document.getElementById('eegSlug').value = '';
+            document.getElementById('eegDomain').value = '';
+            document.getElementById('eegSitz').value = '';
+            document.getElementById('eegZvr').value = '';
+            document.getElementById('eegEmail').value = '';
+            document.getElementById('eegCreditor').value = '';
+            document.getElementById('eegModalTitle').textContent = 'Neue EEG anlegen';
+            document.getElementById('eegModal').style.display = 'flex';
+        });
+
+        function editEeg(id) {
+            const e = allEegs.find(x => x.id === id);
+            if (!e) return;
+            document.getElementById('eegEditId').value = e.id;
+            document.getElementById('eegName').value = e.name || '';
+            document.getElementById('eegSlug').value = e.slug || '';
+            document.getElementById('eegDomain').value = e.domain || '';
+            document.getElementById('eegSitz').value = e.sitz || '';
+            document.getElementById('eegZvr').value = e.zvr_nummer || '';
+            document.getElementById('eegEmail').value = e.kontakt_email || '';
+            document.getElementById('eegCreditor').value = e.creditor_id || '';
+            document.getElementById('eegModalTitle').textContent = 'EEG bearbeiten: ' + e.name;
+            document.getElementById('eegModal').style.display = 'flex';
+        }
+
+        document.getElementById('btnSaveEeg').addEventListener('click', async () => {
+            const editId = document.getElementById('eegEditId').value;
+            const data = {
+                name: document.getElementById('eegName').value,
+                slug: document.getElementById('eegSlug').value,
+                domain: document.getElementById('eegDomain').value || null,
+                sitz: document.getElementById('eegSitz').value,
+                zvr_nummer: document.getElementById('eegZvr').value,
+                kontakt_email: document.getElementById('eegEmail').value,
+                creditor_id: document.getElementById('eegCreditor').value
+            };
+
+            if (!data.name || !data.slug) { alert('Name und Slug sind erforderlich'); return; }
+
+            let res;
+            if (editId) {
+                res = await fetch(`/api/super-admin/eegs/${editId}`, {
+                    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+                });
+            } else {
+                res = await fetch('/api/super-admin/eegs', {
+                    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+                });
+            }
+
+            const result = await res.json();
+            if (result.error) { alert(result.error); return; }
+
+            document.getElementById('eegModal').style.display = 'none';
+            loadEegs();
+        });
+
+        async function toggleEeg(id) {
+            await fetch(`/api/super-admin/eegs/${id}/toggle`, { method: 'PATCH' });
+            loadEegs();
+        }
+
+        // Slug-Vorschau
+        document.getElementById('eegSlug').addEventListener('input', (e) => {
+            const slug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+            e.target.value = slug;
+            document.getElementById('slugPreview').textContent = slug ? `→ ${slug}.eeg-portal.at` : '';
+        });
+
+        // --- USERS ---
+        async function loadUsers() {
+            const res = await fetch('/api/super-admin/users');
+            allUsers = await res.json();
+            document.getElementById('userCount').textContent = `${allUsers.length} Admin-Benutzer`;
+
+            // EEG-Dropdown aktualisieren
+            const eegSelect = document.getElementById('userEeg');
+            eegSelect.innerHTML = '<option value="">-- Keine (Super-Admin) --</option>' +
+                allEegs.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+
+            document.getElementById('usersBody').innerHTML = allUsers.map(u => {
+                const perms = u.berechtigungen || {};
+                const permList = Object.keys(perms).filter(k => perms[k]).join(', ') || '-';
+                const eeg = allEegs.find(e => e.id === u.eeg_id);
+                return `
+                    <tr>
+                        <td><strong>${u.username}</strong></td>
+                        <td>${u.email}</td>
+                        <td><span class="badge badge-${u.rolle === 'super_admin' ? 'primary' : 'info'}">${u.rolle}</span></td>
+                        <td>${eeg ? eeg.name : '-'}</td>
+                        <td style="font-size:0.82rem">${permList}</td>
+                        <td>${u.letzter_login ? new Date(u.letzter_login).toLocaleString('de-AT') : 'Nie'}</td>
+                        <td>${u.aktiv ? '<span class="badge badge-success">Aktiv</span>' : '<span class="badge badge-muted">Inaktiv</span>'}</td>
+                        <td>
+                            <button class="btn btn-sm" onclick="editUser(${u.id})">Bearbeiten</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id})">Löschen</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        document.getElementById('btnNewUser').addEventListener('click', () => {
+            document.getElementById('userEditId').value = '';
+            document.getElementById('userName').value = '';
+            document.getElementById('userEmail').value = '';
+            document.getElementById('userPassword').value = '';
+            document.getElementById('userRolle').value = 'eeg_admin';
+            document.getElementById('userEeg').value = '';
+            document.getElementById('permAntraege').checked = true;
+            document.getElementById('permMitglieder').checked = true;
+            document.getElementById('permExport').checked = true;
+            document.getElementById('permEinstellungen').checked = true;
+            document.getElementById('userModalTitle').textContent = 'Neuen Admin anlegen';
+            document.getElementById('userModal').style.display = 'flex';
+        });
+
+        function editUser(id) {
+            const u = allUsers.find(x => x.id === id);
+            if (!u) return;
+            document.getElementById('userEditId').value = u.id;
+            document.getElementById('userName').value = u.username;
+            document.getElementById('userEmail').value = u.email;
+            document.getElementById('userPassword').value = '';
+            document.getElementById('userRolle').value = u.rolle;
+            document.getElementById('userEeg').value = u.eeg_id || '';
+            const perms = u.berechtigungen || {};
+            document.getElementById('permAntraege').checked = !!perms.antraege;
+            document.getElementById('permMitglieder').checked = !!perms.mitglieder;
+            document.getElementById('permExport').checked = !!perms.export;
+            document.getElementById('permEinstellungen').checked = !!perms.einstellungen;
+            document.getElementById('userModalTitle').textContent = 'Benutzer bearbeiten: ' + u.username;
+            document.getElementById('userModal').style.display = 'flex';
+        }
+
+        document.getElementById('btnSaveUser').addEventListener('click', async () => {
+            const editId = document.getElementById('userEditId').value;
+            const data = {
+                username: document.getElementById('userName').value,
+                email: document.getElementById('userEmail').value,
+                password: document.getElementById('userPassword').value,
+                rolle: document.getElementById('userRolle').value,
+                eeg_id: document.getElementById('userEeg').value || null,
+                berechtigungen: {
+                    antraege: document.getElementById('permAntraege').checked,
+                    mitglieder: document.getElementById('permMitglieder').checked,
+                    export: document.getElementById('permExport').checked,
+                    einstellungen: document.getElementById('permEinstellungen').checked
+                }
+            };
+
+            if (!data.username || !data.email) { alert('Benutzername und E-Mail sind erforderlich'); return; }
+            if (!editId && !data.password) { alert('Passwort ist erforderlich'); return; }
+
+            let res;
+            if (editId) {
+                res = await fetch(`/api/super-admin/users/${editId}`, {
+                    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+                });
+            } else {
+                res = await fetch('/api/super-admin/users', {
+                    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(data)
+                });
+            }
+
+            const result = await res.json();
+            if (result.error) { alert(result.error); return; }
+
+            document.getElementById('userModal').style.display = 'none';
+            loadUsers();
+        });
+
+        async function deleteUser(id) {
+            if (!confirm('Diesen Benutzer wirklich löschen?')) return;
+            const res = await fetch(`/api/super-admin/users/${id}`, { method: 'DELETE' });
+            const result = await res.json();
+            if (result.error) { alert(result.error); return; }
+            loadUsers();
+        }
+
+        // --- AUDIT ---
+        async function loadAudit() {
+            const res = await fetch('/api/super-admin/audit-log');
+            const logs = await res.json();
+
+            document.getElementById('auditBody').innerHTML = logs.map(l => {
+                let details = '';
+                try { details = l.details ? JSON.stringify(JSON.parse(l.details)).substring(0, 80) : ''; }
+                catch { details = l.details || ''; }
+                return `
+                    <tr>
+                        <td>${new Date(l.created_at).toLocaleString('de-AT')}</td>
+                        <td>${l.username || '-'}</td>
+                        <td>${l.aktion}</td>
+                        <td style="font-size:0.82rem;max-width:300px;overflow:hidden;text-overflow:ellipsis">${details}</td>
+                        <td style="font-size:0.82rem">${l.ip_adresse || '-'}</td>
+                    </tr>
+                `;
+            }).join('') || '<tr><td colspan="5" class="text-muted" style="text-align:center;padding:2rem">Noch keine Einträge</td></tr>';
+        }
+
+        // --- INIT ---
+        document.getElementById('btnLogout').addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/admin/';
+        });
+        document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('open');
+        });
+
+        checkAuth().then(user => {
+            if (user) { loadEegs(); }
+        });
+    </script>
+</body>
+</html>

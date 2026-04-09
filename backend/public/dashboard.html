@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - EEG Admin</title>
+    <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2">
+                <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+            </svg>
+            <span>EEG-Portal</span>
+        </div>
+        <ul class="sidebar-nav">
+            <li class="active"><a href="/admin/dashboard.html">Dashboard</a></li>
+            <li><a href="/admin/applications.html">Antrage</a></li>
+            <li><a href="/admin/members.html">Mitglieder</a></li>
+            <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span id="adminName"></span>
+            <button class="btn-logout" id="btnLogout">Abmelden</button>
+        </div>
+    </nav>
+
+    <!-- Main -->
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Dashboard</h1>
+            <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card stat-primary">
+                <div class="stat-value" id="statAktiv">-</div>
+                <div class="stat-label">Aktive Mitglieder</div>
+            </div>
+            <div class="stat-card stat-warning">
+                <div class="stat-value" id="statEingereicht">-</div>
+                <div class="stat-label">Offene Antrage</div>
+            </div>
+            <div class="stat-card stat-success">
+                <div class="stat-value" id="statGenehmigt">-</div>
+                <div class="stat-label">Genehmigt</div>
+            </div>
+            <div class="stat-card stat-danger">
+                <div class="stat-value" id="statAbgelehnt">-</div>
+                <div class="stat-label">Abgelehnt</div>
+            </div>
+            <div class="stat-card stat-info">
+                <div class="stat-value" id="statTotal">-</div>
+                <div class="stat-label">Gesamt</div>
+            </div>
+            <div class="stat-card stat-muted">
+                <div class="stat-value" id="statEntwuerfe">-</div>
+                <div class="stat-label">Entwuerfe</div>
+            </div>
+        </div>
+
+        <!-- Nach Typ -->
+        <div class="card" style="margin-top:1.5rem">
+            <h3>Mitglieder nach Typ</h3>
+            <div id="typeBreakdown" class="type-breakdown"></div>
+        </div>
+
+        <!-- Letzte Antrage -->
+        <div class="card" style="margin-top:1.5rem">
+            <h3>Letzte Antrage (30 Tage)</h3>
+            <div id="recentChart" class="chart-placeholder"></div>
+        </div>
+    </main>
+
+    <script>
+        // Auth-Check
+        async function checkAuth() {
+            try {
+                const res = await fetch('/api/auth/me');
+                const data = await res.json();
+                if (!data.id) { window.location.href = '/admin/'; return null; }
+                document.getElementById('adminName').textContent = data.username;
+                return data;
+            } catch { window.location.href = '/admin/'; return null; }
+        }
+
+        async function loadStats() {
+            const res = await fetch('/api/admin/dashboard/stats');
+            const data = await res.json();
+
+            document.getElementById('statAktiv').textContent = data.aktive_mitglieder || 0;
+            document.getElementById('statEingereicht').textContent = (parseInt(data.eingereicht || 0) + parseInt(data.in_pruefung || 0));
+            document.getElementById('statGenehmigt').textContent = data.genehmigt || 0;
+            document.getElementById('statAbgelehnt').textContent = data.abgelehnt || 0;
+            document.getElementById('statTotal').textContent = data.total || 0;
+            document.getElementById('statEntwuerfe').textContent = data.entwuerfe || 0;
+
+            // Typ-Aufschluesselung
+            const typDiv = document.getElementById('typeBreakdown');
+            if (data.nach_typ && data.nach_typ.length > 0) {
+                typDiv.innerHTML = data.nach_typ.map(t => `
+                    <div class="type-item">
+                        <span class="type-name">${t.typ}</span>
+                        <span class="type-count">${t.count}</span>
+                    </div>
+                `).join('');
+            } else {
+                typDiv.innerHTML = '<p class="text-muted">Noch keine aktiven Mitglieder.</p>';
+            }
+
+            // Verlauf (einfache Textdarstellung)
+            const chartDiv = document.getElementById('recentChart');
+            if (data.verlauf && data.verlauf.length > 0) {
+                const maxCount = Math.max(...data.verlauf.map(d => d.count));
+                chartDiv.innerHTML = `<div class="simple-chart">${data.verlauf.map(d => {
+                    const pct = maxCount > 0 ? (d.count / maxCount * 100) : 0;
+                    const date = new Date(d.datum).toLocaleDateString('de-AT', { day: '2-digit', month: '2-digit' });
+                    return `<div class="chart-bar-wrap"><div class="chart-bar" style="height:${pct}%"></div><span>${date}</span></div>`;
+                }).join('')}</div>`;
+            } else {
+                chartDiv.innerHTML = '<p class="text-muted">Noch keine Antrage in den letzten 30 Tagen.</p>';
+            }
+        }
+
+        // Logout
+        document.getElementById('btnLogout').addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            localStorage.removeItem('admin_user');
+            window.location.href = '/admin/';
+        });
+
+        // Sidebar Toggle
+        document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('open');
+        });
+
+        // Init
+        checkAuth().then(user => { if (user) loadStats(); });
+    </script>
+</body>
+</html>

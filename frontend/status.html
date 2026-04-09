@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Antragsstatus - EEG</title>
+    <link rel="stylesheet" href="/css/onboarding.css">
+</head>
+<body>
+    <div class="bg-overlay"></div>
+
+    <div class="container">
+        <header class="eeg-header">
+            <h1 id="eegName">Energiegemeinschaft</h1>
+        </header>
+
+        <main class="status-content">
+            <!-- Login -->
+            <div id="statusLogin" class="card">
+                <h2>Antragsstatus pruefen</h2>
+                <p>Gib deine E-Mail-Adresse und deine Passphrase ein, um den Status deines Antrags einzusehen.</p>
+
+                <div class="form-section">
+                    <div class="form-group">
+                        <label for="statusEmail">E-Mail-Adresse</label>
+                        <input type="email" id="statusEmail" placeholder="deine@email.at">
+                    </div>
+                    <div class="form-group">
+                        <label for="statusPassphrase">Passphrase</label>
+                        <input type="text" id="statusPassphrase" placeholder="wort-wort-wort-wort-wort">
+                    </div>
+                    <button class="btn btn-primary" id="btnStatusCheck">Status pruefen</button>
+                    <p id="statusError" class="error-text" style="display:none"></p>
+                </div>
+            </div>
+
+            <!-- Ergebnis -->
+            <div id="statusResult" class="card" style="display:none">
+                <h2>Dein Antragsstatus</h2>
+
+                <div class="status-info">
+                    <div class="status-row">
+                        <span class="status-label">Name:</span>
+                        <span id="resName"></span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">EEG:</span>
+                        <span id="resEeg"></span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Mitgliedstyp:</span>
+                        <span id="resType"></span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Status:</span>
+                        <span id="resStatus" class="status-badge"></span>
+                    </div>
+                    <div class="status-row">
+                        <span class="status-label">Eingereicht am:</span>
+                        <span id="resDate"></span>
+                    </div>
+                </div>
+
+                <div class="status-actions">
+                    <button class="btn btn-secondary" id="btnDsgvoAuskunft">Datenauskunft (Art. 15 DSGVO)</button>
+                    <button class="btn" id="btnBack2">Zurueck</button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.getElementById('btnStatusCheck').addEventListener('click', async () => {
+            const email = document.getElementById('statusEmail').value;
+            const passphrase = document.getElementById('statusPassphrase').value;
+            const errorEl = document.getElementById('statusError');
+
+            if (!email || !passphrase) { errorEl.textContent = 'Bitte alle Felder ausfuellen'; errorEl.style.display = 'block'; return; }
+
+            try {
+                const res = await fetch('/api/applicant/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, passphrase })
+                });
+                const data = await res.json();
+
+                if (data.error) { errorEl.textContent = data.error; errorEl.style.display = 'block'; return; }
+
+                errorEl.style.display = 'none';
+                document.getElementById('statusLogin').style.display = 'none';
+                document.getElementById('statusResult').style.display = 'block';
+
+                document.getElementById('resName').textContent = `${data.vorname} ${data.nachname}`;
+                document.getElementById('resEeg').textContent = data.eeg_name;
+                document.getElementById('resType').textContent = data.member_type;
+
+                const statusEl = document.getElementById('resStatus');
+                statusEl.textContent = data.status_text;
+                statusEl.className = `status-badge status-${data.status}`;
+
+                document.getElementById('resDate').textContent = data.eingereicht_am
+                    ? new Date(data.eingereicht_am).toLocaleDateString('de-AT')
+                    : 'Noch nicht eingereicht';
+
+            } catch (err) {
+                errorEl.textContent = 'Verbindungsfehler'; errorEl.style.display = 'block';
+            }
+        });
+
+        document.getElementById('btnBack2')?.addEventListener('click', () => {
+            document.getElementById('statusLogin').style.display = 'block';
+            document.getElementById('statusResult').style.display = 'none';
+        });
+
+        document.getElementById('btnDsgvoAuskunft')?.addEventListener('click', async () => {
+            const email = document.getElementById('statusEmail').value;
+            const passphrase = document.getElementById('statusPassphrase').value;
+
+            const res = await fetch('/api/applicant/dsgvo/auskunft', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, passphrase })
+            });
+            const data = await res.json();
+
+            // JSON als Download anbieten
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'meine-daten-dsgvo.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>

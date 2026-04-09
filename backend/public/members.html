@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mitglieder - EEG Admin</title>
+    <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/></svg><span>EEG-Portal</span></div>
+        <ul class="sidebar-nav">
+            <li><a href="/admin/dashboard.html">Dashboard</a></li>
+            <li><a href="/admin/applications.html">Antrage</a></li>
+            <li class="active"><a href="/admin/members.html">Mitglieder</a></li>
+            <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+        </ul>
+        <div class="sidebar-footer"><span id="adminName"></span><button class="btn-logout" id="btnLogout">Abmelden</button></div>
+    </nav>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Mitglieder</h1>
+            <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
+        </div>
+
+        <div class="toolbar">
+            <input type="text" id="searchInput" placeholder="Suche..." class="toolbar-search">
+        </div>
+
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Typ</th>
+                        <th>E-Mail</th>
+                        <th>PLZ/Ort</th>
+                        <th>IBAN</th>
+                        <th>Zaehlpunkte</th>
+                        <th>Seit</th>
+                    </tr>
+                </thead>
+                <tbody id="membersBody"></tbody>
+            </table>
+        </div>
+    </main>
+
+    <script>
+        async function load() {
+            const res = await fetch('/api/auth/me');
+            const user = await res.json();
+            if (!user.id) { window.location.href = '/admin/'; return; }
+            document.getElementById('adminName').textContent = user.username;
+
+            const search = document.getElementById('searchInput').value;
+            const mRes = await fetch(`/api/admin/members?search=${encodeURIComponent(search)}`);
+            const data = await mRes.json();
+
+            document.getElementById('membersBody').innerHTML = (data.members || []).map(m => `
+                <tr>
+                    <td><strong>${m.firmenname || `${m.vorname} ${m.nachname}`}</strong></td>
+                    <td>${m.member_type}</td>
+                    <td>${m.email || '-'}</td>
+                    <td>${m.plz || ''} ${m.ort || ''}</td>
+                    <td>${m.iban ? m.iban.replace(/(.{4})/g, '$1 ').trim() : '-'}</td>
+                    <td>${[m.zp_bezug, m.zp_einspeisung].filter(Boolean).join(', ') || '-'}</td>
+                    <td>${m.genehmigt_am ? new Date(m.genehmigt_am).toLocaleDateString('de-AT') : '-'}</td>
+                </tr>
+            `).join('');
+        }
+
+        document.getElementById('searchInput').addEventListener('input', () => { clearTimeout(window._st); window._st = setTimeout(load, 300); });
+        document.getElementById('btnLogout').addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/admin/'; });
+        document.getElementById('btnToggleSidebar')?.addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
+        load();
+    </script>
+</body>
+</html>
