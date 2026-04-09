@@ -9,14 +9,14 @@
 
     // --- Konfiguration ---
     const CFG = {
-        panelW: 120,        // Breite eines Panels
-        panelH: 80,         // Höhe eines Panels
-        gap: 18,            // Abstand zwischen Panels
+        panelW: 110,        // Breite eines Panels
+        panelH: 72,         // Höhe eines Panels
+        gap: 14,            // Abstand zwischen Panels
         cellsX: 6,          // Interne Zellen horizontal
         cellsY: 4,          // Interne Zellen vertikal
-        waveSpeed: 0.0012,  // Geschwindigkeit der Lichtwelle
-        waveWidth: 0.35,    // Breite der Lichtwelle (0-1)
-        particleCount: 60,  // Anzahl Energie-Partikel
+        waveSpeed: 0.0008,  // Geschwindigkeit der Lichtwelle
+        waveWidth: 0.4,     // Breite der Lichtwelle (0-1)
+        particleCount: 80,  // Anzahl Energie-Partikel
         fps: 40,
     };
 
@@ -28,8 +28,8 @@
         constructor(x, y, col, row) {
             this.x = x; this.y = y;
             this.col = col; this.row = row;
-            this.glow = 0;       // 0-1 aktuelle Helligkeit
-            this.baseGlow = 0.05 + Math.random() * 0.08;
+            this.glow = 0;
+            this.baseGlow = 0.12 + Math.random() * 0.12;
         }
 
         // Diagonal-Position für Wellenberechnung (0-1)
@@ -51,11 +51,13 @@
             const g = this.glow;
 
             // Panel-Rahmen
-            const frameAlpha = 0.15 + g * 0.3;
-            ctx.fillStyle = `rgba(20, 50, 90, ${frameAlpha})`;
-            ctx.strokeStyle = `rgba(60, 140, 220, ${0.1 + g * 0.5})`;
-            ctx.lineWidth = 1.2;
-            roundRect(ctx, this.x, this.y, pw, ph, 4);
+            const frameAlpha = 0.25 + g * 0.35;
+            ctx.fillStyle = `rgba(10, 28, 60, ${frameAlpha})`;
+            ctx.strokeStyle = g > 0.3
+                ? `rgba(0, 210, 140, ${0.15 + g * 0.65})`
+                : `rgba(40, 100, 180, ${0.12 + g * 0.4})`;
+            ctx.lineWidth = 1.5;
+            roundRect(ctx, this.x, this.y, pw, ph, 5);
             ctx.fill();
             ctx.stroke();
 
@@ -70,33 +72,44 @@
                     const cy2 = oy + row * cellH;
 
                     // Zellen-Füllung
-                    const cellAlpha = 0.08 + g * 0.55;
-                    ctx.fillStyle = g > 0.4
-                        ? `rgba(180, 210, 255, ${cellAlpha})`
-                        : `rgba(30, 70, 130, ${cellAlpha})`;
+                    const cellAlpha = 0.12 + g * 0.6;
+                    ctx.fillStyle = g > 0.35
+                        ? `rgba(0, 220, 160, ${cellAlpha * 0.6})`
+                        : `rgba(20, 60, 120, ${cellAlpha})`;
                     ctx.fillRect(cx2 + 0.5, cy2 + 0.5, cellW - 1, cellH - 1);
 
                     // Zellen-Border
-                    ctx.strokeStyle = `rgba(80, 160, 240, ${0.06 + g * 0.2})`;
+                    ctx.strokeStyle = g > 0.35
+                        ? `rgba(0, 230, 160, ${0.1 + g * 0.25})`
+                        : `rgba(60, 140, 220, ${0.08 + g * 0.18})`;
                     ctx.lineWidth = 0.5;
                     ctx.strokeRect(cx2 + 0.5, cy2 + 0.5, cellW - 1, cellH - 1);
                 }
             }
 
-            // Glanz-Reflex (diagonale Linie)
-            if (g > 0.15) {
-                const refAlpha = (g - 0.15) * 0.7;
-                const grad = ctx.createLinearGradient(this.x, this.y, this.x + pw * 0.6, this.y + ph * 0.6);
-                grad.addColorStop(0, `rgba(255, 230, 150, ${refAlpha * 0.8})`);
-                grad.addColorStop(0.4, `rgba(255, 255, 255, ${refAlpha * 0.4})`);
+            // Glanz-Reflex
+            if (g > 0.2) {
+                const refAlpha = (g - 0.2) * 0.65;
+                const grad = ctx.createLinearGradient(this.x, this.y, this.x + pw * 0.7, this.y + ph * 0.7);
+                grad.addColorStop(0, `rgba(200, 255, 230, ${refAlpha * 0.6})`);
+                grad.addColorStop(0.35, `rgba(255, 255, 255, ${refAlpha * 0.25})`);
                 grad.addColorStop(1, 'transparent');
                 ctx.fillStyle = grad;
-                roundRect(ctx, this.x, this.y, pw, ph, 4);
+                roundRect(ctx, this.x, this.y, pw, ph, 5);
                 ctx.fill();
             }
 
-            // Partikel-Emitter wenn hell genug
-            if (g > 0.5 && Math.random() < g * 0.04) {
+            // Panel-Glow wenn sehr hell
+            if (g > 0.55) {
+                ctx.shadowColor = 'rgba(0, 220, 150, 0.5)';
+                ctx.shadowBlur = 12 * g;
+                roundRect(ctx, this.x, this.y, pw, ph, 5);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Partikel-Emitter
+            if (g > 0.45 && Math.random() < g * 0.05) {
                 spawnParticle(
                     this.x + 4 + Math.random() * (pw - 8),
                     this.y + Math.random() * ph
@@ -208,13 +221,13 @@
 
         // Hintergrund
         ctx.clearRect(0, 0, W, H);
-        ctx.fillStyle = '#0f1923';
+        ctx.fillStyle = '#080f18';
         ctx.fillRect(0, 0, W, H);
 
-        // Subtiler Basis-Gradient
-        const bgGrad = ctx.createRadialGradient(W * 0.3, H * 0.2, 0, W * 0.3, H * 0.2, W * 0.7);
-        bgGrad.addColorStop(0, 'rgba(26,60,115,0.4)');
-        bgGrad.addColorStop(0.5, 'rgba(0,80,60,0.15)');
+        // Basis-Gradient: dunkelblau → grün-teal
+        const bgGrad = ctx.createRadialGradient(W * 0.25, H * 0.15, 0, W * 0.25, H * 0.15, W * 0.8);
+        bgGrad.addColorStop(0, 'rgba(10, 40, 90, 0.6)');
+        bgGrad.addColorStop(0.4, 'rgba(0, 60, 50, 0.3)');
         bgGrad.addColorStop(1, 'transparent');
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, W, H);
@@ -230,15 +243,14 @@
         particles = particles.filter(p => p.life > 0.01);
         particles.forEach(p => { p.update(); p.draw(); });
 
-        // Dünner Lichtstrahl entlang der Welle
+        // Lichtstrahl entlang der Welle
         if (wavePos > 0 && wavePos < 1) {
-            const x1 = wavePos * W * 1.5 - H * 0.5;
-            const y1 = 0;
-            const x2 = wavePos * W * 1.5 + W * 0.3;
-            const y2 = H;
-            const rayGrad = ctx.createLinearGradient(x1 - 80, y1, x1 + 80, y1);
+            const cx = wavePos * W * 1.4 - H * 0.3;
+            const rayGrad = ctx.createLinearGradient(cx - 120, 0, cx + 120, 0);
             rayGrad.addColorStop(0, 'transparent');
-            rayGrad.addColorStop(0.5, 'rgba(255, 230, 150, 0.06)');
+            rayGrad.addColorStop(0.4, 'rgba(0, 220, 150, 0.04)');
+            rayGrad.addColorStop(0.5, 'rgba(180, 255, 220, 0.09)');
+            rayGrad.addColorStop(0.6, 'rgba(0, 220, 150, 0.04)');
             rayGrad.addColorStop(1, 'transparent');
             ctx.fillStyle = rayGrad;
             ctx.fillRect(0, 0, W, H);
