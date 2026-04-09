@@ -58,7 +58,7 @@ async function ocrWithGemini(base64, mediaType, apiKey) {
     const part = { inlineData: { mimeType: mediaType, data: base64 } };
     const body = {
         contents: [{ parts: [part, { text: EXTRACTION_PROMPT }] }],
-        generationConfig: { maxOutputTokens: 1024 }
+        generationConfig: { maxOutputTokens: 4096 }
     };
 
     // Gecachtes Modell zuerst versuchen
