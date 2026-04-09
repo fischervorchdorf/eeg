@@ -20,16 +20,26 @@
             if (parts.length >= 3 && parts[0] !== 'www') eegSlug = parts[0];
         }
 
-        // Aus localStorage
-        const cached = localStorage.getItem('eeg_config');
-        if (cached) eegConfig = JSON.parse(cached);
-
         if (eegSlug) {
             try {
                 eegConfig = await OnboardingAPI.loadEeg(eegSlug);
-                localStorage.setItem('eeg_config', JSON.stringify(eegConfig));
-                applyBranding(eegConfig);
+                if (eegConfig && !eegConfig.error) {
+                    localStorage.setItem('eeg_config', JSON.stringify(eegConfig));
+                    applyBranding(eegConfig);
+                }
             } catch (e) { console.error('EEG laden fehlgeschlagen:', e); }
+        }
+
+        // Fallback: Wenn keine EEG via URL gefunden, Default-Tenant laden
+        if (!eegConfig || eegConfig.error || !eegConfig.id) {
+            try {
+                const defaultEeg = await OnboardingAPI.loadDefaultEeg();
+                if (defaultEeg && defaultEeg.id) {
+                    eegConfig = defaultEeg;
+                    localStorage.setItem('eeg_config', JSON.stringify(eegConfig));
+                    applyBranding(eegConfig);
+                }
+            } catch (e) { console.error('Default-EEG laden fehlgeschlagen:', e); }
         }
 
         // Member-Types laden
@@ -45,18 +55,116 @@
         document.getElementById('addEinspeisungZp').addEventListener('click', () => addZählpunkt('einspeisung'));
         document.getElementById('addSpeicher').addEventListener('click', addSpeicher);
 
-        // Live-Validierung
+        // Live-Validierung + Autofill + Help-System
         setupLiveValidation();
+        setupAutofill();
+        HelpSystem.init();
+        setupOcrUpload();
+        setupEmailVerification();
+        setupPdfPreview();
 
         // File Uploads
         initFileUploads();
 
-        // Resume check
+        // Stale-Session-Check
         if (OnboardingAPI.restoreSession()) {
-            // Optionale Resume-Logik
+            const stillValid = await OnboardingAPI.checkSession(OnboardingAPI.applicationId, OnboardingAPI.passphrase);
+            if (!stillValid) {
+                console.warn('Stale session - cleared');
+                OnboardingAPI.clearSession();
+            }
         }
 
         showStep(1);
+    }
+
+    function setupAutofill() {
+        // PLZ → Ort
+        Autofill.setupPlzAutofill('plz', 'ort');
+        // IBAN → Bank
+        Autofill.setupIbanBankAutofill('iban', 'bankname');
+    }
+
+    function setupOcrUpload() {
+        const btn = document.getElementById('btnOcrUpload');
+        const fileInput = document.getElementById('ocrFile');
+        if (!btn || !fileInput) return;
+        Autofill.setupOcrUpload('btnOcrUpload', 'ocrFile', (extracted) => {
+            Autofill.fillFromOcr(extracted);
+            const msg = document.getElementById('ocrResult');
+            if (msg) {
+                msg.textContent = '✓ Felder wurden ausgefüllt – bitte überprüfen';
+                msg.className = 'ocr-result success';
+                setTimeout(() => { msg.textContent = ''; msg.className = 'ocr-result'; }, 4000);
+            }
+        });
+    }
+
+    function setupPdfPreview() {
+        const btn = document.getElementById('btnPreviewPdf');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            if (!OnboardingAPI.applicationId) { alert('Kein aktiver Antrag'); return; }
+            window.open(OnboardingAPI.previewPdfUrl(), '_blank');
+        });
+    }
+
+    function setupEmailVerification() {
+        const sendBtn = document.getElementById('btnSendVerification');
+        const checkBtn = document.getElementById('btnCheckVerification');
+        if (sendBtn) {
+            sendBtn.addEventListener('click', async () => {
+                const email = val('email');
+                const validation = Validators.email(email);
+                if (!validation.valid) { alert(validation.error); return; }
+                if (!OnboardingAPI.applicationId) { alert('Bitte erst Mitgliedstyp waehlen'); return; }
+
+                sendBtn.disabled = true;
+                sendBtn.textContent = 'Sende...';
+                const result = await OnboardingAPI.sendVerificationCode(email);
+                sendBtn.disabled = false;
+                sendBtn.textContent = 'Code erneut senden';
+
+                if (result.success) {
+                    document.getElementById('verifyCodeBox').style.display = 'block';
+                    const msg = document.getElementById('verifyMsg');
+                    if (result.dev_code) {
+                        msg.innerHTML = `✓ Code gesendet an ${email}<br><strong style="font-size:1.2em; background:rgba(78,163,114,0.2); padding:4px 10px; border-radius:4px; letter-spacing:2px;">DEV-MODUS: ${result.dev_code}</strong><br><small>Kein SMTP konfiguriert - der Code wird nur hier angezeigt und im Server-Terminal.</small>`;
+                        // Code direkt einfüllen damit der User nur noch "Code prüfen" klicken muss
+                        document.getElementById('verifyCode').value = result.dev_code;
+                    } else {
+                        msg.textContent = '✓ Code gesendet – bitte Posteingang prüfen (auch Spam-Ordner)';
+                    }
+                    msg.className = 'verify-msg success';
+                } else {
+                    alert(result.error || 'Senden fehlgeschlagen');
+                }
+            });
+        }
+        if (checkBtn) {
+            checkBtn.addEventListener('click', async () => {
+                const code = val('verifyCode');
+                if (!/^\d{6}$/.test(code)) { alert('Bitte 6-stelligen Code eingeben'); return; }
+
+                checkBtn.disabled = true;
+                const result = await OnboardingAPI.checkVerificationCode(code);
+                checkBtn.disabled = false;
+
+                const msg = document.getElementById('verifyMsg');
+                if (result.success) {
+                    msg.textContent = '✓ E-Mail bestätigt!';
+                    msg.className = 'verify-msg success';
+                    document.getElementById('emailVerifiedFlag').value = '1';
+                    document.getElementById('email').setAttribute('readonly', 'readonly');
+                    document.getElementById('email').classList.add('input-verified');
+                    checkBtn.style.display = 'none';
+                    document.getElementById('btnSendVerification').style.display = 'none';
+                } else {
+                    msg.textContent = result.error || 'Code falsch';
+                    msg.className = 'verify-msg error';
+                }
+            });
+        }
     }
 
     function applyBranding(eeg) {
@@ -162,16 +270,27 @@
 
         btnBack.style.display = step > 1 ? 'flex' : 'none';
 
+        // onclick nie setzen - addEventListener haelt nextStep gebunden
+        btnNext.onclick = null;
+
         if (step === totalSteps) {
-            btnNext.textContent = 'Zurueck zur Hauptseite';
-            btnNext.onclick = () => { OnboardingAPI.clearSession(); window.location.href = '/'; };
+            btnNext.textContent = '← Zur Hauptseite';
         } else if (step === 9) {
-            btnNext.textContent = 'Antrag einreichen';
+            btnNext.textContent = '✓ Antrag einreichen';
         } else if (step === 1 && !selectedType) {
-            btnNext.textContent = 'Los gehts!';
+            btnNext.textContent = 'Los geht\'s!';
         } else {
-            btnNext.textContent = 'Weiter zum naechsten Schritt';
-            btnNext.onclick = nextStep;
+            btnNext.textContent = 'Weiter';
+        }
+
+        // Schritt-Zähler
+        const stepCounterEl = document.getElementById('stepCounter');
+        if (stepCounterEl) {
+            if (step < totalSteps) {
+                stepCounterEl.textContent = `Schritt ${step} von ${totalSteps - 1}`;
+            } else {
+                stepCounterEl.textContent = '';
+            }
         }
 
         // Progress
@@ -187,7 +306,15 @@
 
     async function nextStep() {
         const btnNext = document.getElementById('btnNext');
+        if (btnNext.disabled) return;
         btnNext.disabled = true;
+
+        // Step 10 = Abschluss - zurueck zur Startseite
+        if (currentStep === totalSteps) {
+            OnboardingAPI.clearSession();
+            window.location.href = '/';
+            return;
+        }
 
         try {
             // Step-spezifische Logik
@@ -209,20 +336,20 @@
                     if (!data) { btnNext.disabled = false; return; }
                     const result = await OnboardingAPI.saveStep('personal', data);
                     if (result.errors) { showErrors(result.errors); btnNext.disabled = false; return; }
-                    if (result.error) { alert(result.error); btnNext.disabled = false; return; }
+                    if (result.error) { if (await safeError(result)) return; alert(result.error); btnNext.disabled = false; return; }
                     break;
                 }
                 case 4: { // Zahlpunkte speichern
                     const data = collectZaehlpunkte();
                     if (!data) { btnNext.disabled = false; return; }
                     const result = await OnboardingAPI.saveStep('zaehlpunkte', data);
-                    if (result.error) { alert(result.error); btnNext.disabled = false; return; }
+                    if (result.error) { if (await safeError(result)) return; alert(result.error); btnNext.disabled = false; return; }
                     break;
                 }
                 case 5: { // Ergaenzende Angaben
                     const data = collectZpDetails();
                     const result = await OnboardingAPI.saveStep('ergaenzend', data);
-                    if (result.error) { alert(result.error); btnNext.disabled = false; return; }
+                    if (result.error) { if (await safeError(result)) return; alert(result.error); btnNext.disabled = false; return; }
                     break;
                 }
                 case 6: break; // Dokumente - werden inline hochgeladen
@@ -232,10 +359,10 @@
                     if (!data) { btnNext.disabled = false; return; }
                     const result = await OnboardingAPI.saveStep('zahlung', data);
                     if (result.errors) { showErrors(result.errors); btnNext.disabled = false; return; }
-                    if (result.error) { alert(result.error); btnNext.disabled = false; return; }
+                    if (result.error) { if (await safeError(result)) return; alert(result.error); btnNext.disabled = false; return; }
                     break;
                 }
-                case 8: { // Bestaetigungen
+                case 8: { // Bestätigungen
                     const data = collectConfirmations();
                     if (!data) { btnNext.disabled = false; return; }
                     const result = await OnboardingAPI.saveStep('bestaetigung', data);
@@ -267,6 +394,18 @@
         btnNext.disabled = false;
     }
 
+    // Wrapper um saveStep mit Stale-Session-Handling
+    async function safeError(result) {
+        if (!result) return false;
+        if (result.error === 'Antrag nicht gefunden') {
+            alert('Deine Sitzung ist abgelaufen. Du wirst jetzt zur Startseite geleitet.');
+            OnboardingAPI.clearSession();
+            window.location.reload();
+            return true;
+        }
+        return false;
+    }
+
     function prevStep() {
         if (currentStep > 1) showStep(currentStep - 1);
     }
@@ -295,6 +434,43 @@
             if (!data[f]?.trim()) {
                 highlightField(f);
                 alert('Bitte alle Pflichtfelder ausfüllen');
+                return null;
+            }
+        }
+
+        // Ausweisnummer-Format prüfen (wenn angegeben)
+        if (data.ausweisnummer?.trim()) {
+            const nr = data.ausweisnummer.trim().toUpperCase();
+            let formatOk = true;
+            let formatHint = '';
+            switch (data.ausweis_typ) {
+                case 'Reisepass':
+                    if (!/^[A-Z]\d{7}$/.test(nr)) {
+                        formatOk = false;
+                        formatHint = 'Reisepass: 1 Buchstabe + 7 Ziffern (z.B. P1234567)';
+                    }
+                    break;
+                case 'Personalausweis':
+                    if (!/^[A-Z0-9]{8,9}$/.test(nr)) {
+                        formatOk = false;
+                        formatHint = 'Personalausweis: 8-9 alphanumerische Zeichen';
+                    }
+                    break;
+                case 'Führerschein':
+                    if (!/^\d{7,8}$/.test(nr)) {
+                        formatOk = false;
+                        formatHint = 'Führerschein: 7-8 stellige Zahl';
+                    }
+                    break;
+                default:
+                    if (nr.length < 4) {
+                        formatOk = false;
+                        formatHint = 'Ausweisnummer mind. 4 Zeichen';
+                    }
+            }
+            if (!formatOk) {
+                highlightField('ausweisnummer');
+                alert(formatHint);
                 return null;
             }
         }
@@ -395,7 +571,7 @@
         };
 
         if (!data.statuten_akzeptiert || !data.agb_akzeptiert || !data.datenschutz_akzeptiert || !data.netzbetreiber_vollmacht) {
-            alert('Bitte alle Bestaetigungen akzeptieren');
+            alert('Bitte alle Bestätigungen akzeptieren');
             return null;
         }
 
@@ -418,8 +594,8 @@
     // --- DYNAMIC UI ---
     function addZählpunkt(typ) {
         const container = typ === 'bezug'
-            ? document.getElementById('bezugZählpunkte')
-            : document.getElementById('einspeisungZählpunkte');
+            ? document.getElementById('bezugZaehlpunkte')
+            : document.getElementById('einspeisungZaehlpunkte');
 
         const idx = container.querySelectorAll('.zp-entry').length;
         const div = document.createElement('div');
@@ -456,6 +632,9 @@
 
         div.querySelector('.btn-remove-zp').addEventListener('click', () => div.remove());
         container.appendChild(div);
+
+        // Netzbetreiber-Detection auf neues Feld haengen
+        Autofill.setupZaehlpunktNetzbetreiber(container);
     }
 
     function addSpeicher() {
@@ -564,36 +743,27 @@
     }
 
     function setupLiveValidation() {
-        // IBAN
-        const ibanEl = document.getElementById('iban');
-        if (ibanEl) {
-            ibanEl.addEventListener('blur', () => Validators.validateField(ibanEl, Validators.iban));
-        }
+        const hookField = (id, validatorFn) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener('blur', () => Validators.validateField(el, validatorFn));
+        };
 
-        // PLZ
-        const plzEl = document.getElementById('plz');
-        if (plzEl) {
-            plzEl.addEventListener('blur', () => Validators.validateField(plzEl, Validators.plz));
-        }
+        hookField('iban', Validators.iban);
+        hookField('plz', Validators.plz);
+        hookField('email', Validators.email);
+        hookField('uid_nummer', Validators.uid);
+        hookField('firmenbuchnummer', Validators.firmenbuchnummer);
 
-        // Email
-        const emailEl = document.getElementById('email');
-        if (emailEl) {
-            emailEl.addEventListener('blur', () => Validators.validateField(emailEl, Validators.email));
-        }
-
-        // UID
-        const uidEl = document.getElementById('uid_nummer');
-        if (uidEl) {
-            uidEl.addEventListener('blur', () => Validators.validateField(uidEl, Validators.uid));
-        }
-
-        // Zahlpunkt-Nummern (delegiert)
+        // Zahlpunkt-Nummern (delegiert) + Netzbetreiber-Detection
         document.addEventListener('blur', (e) => {
             if (e.target.classList.contains('zp-nummer')) {
                 Validators.validateField(e.target, Validators.zaehlpunkt);
             }
         }, true);
+
+        // Netzbetreiber-Hook auf initialen ZP-Eintrag
+        const initial = document.getElementById('bezugZaehlpunkte');
+        if (initial) Autofill.setupZaehlpunktNetzbetreiber(initial);
     }
 
     // Start

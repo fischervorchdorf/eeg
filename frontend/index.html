@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/onboarding.css">
 </head>
 <body>
+    <canvas id="solarCanvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
     <div class="bg-overlay"></div>
 
     <div class="container">
@@ -82,6 +83,7 @@
         </div>
     </div>
 
+    <script src="/js/solar-bg.js"></script>
     <script>
         // EEG-Slug aus URL oder Query-Parameter laden
         const urlParams = new URLSearchParams(window.location.search);

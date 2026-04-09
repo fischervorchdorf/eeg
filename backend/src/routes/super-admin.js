@@ -89,18 +89,27 @@ router.patch('/eegs/:id/toggle', async (req, res) => {
 router.get('/users', async (req, res) => {
     try {
         const [users] = await pool.query(
-            `SELECT u.id, u.username, u.email, u.rolle, u.eeg_id, u.berechtigungen,
-                    u.aktiv, u.letzter_login, u.created_at,
-                    e.name as eeg_name
+            `SELECT u.id, u.username, u.email, u.rolle, u.berechtigungen,
+                    u.aktiv, u.letzter_login, u.created_at
              FROM eeg_admin_users u
-             LEFT JOIN eeg_tenants e ON e.id = u.eeg_id
              ORDER BY u.rolle DESC, u.username`
         );
+
+        // EEG-Zuweisungen laden
+        const [zuweisungen] = await pool.query(
+            `SELECT aue.user_id, aue.eeg_id, e.name as eeg_name
+             FROM eeg_admin_user_eegs aue
+             JOIN eeg_tenants e ON e.id = aue.eeg_id
+             ORDER BY e.name`
+        );
+
         users.forEach(u => {
             if (typeof u.berechtigungen === 'string') {
                 try { u.berechtigungen = JSON.parse(u.berechtigungen); } catch { u.berechtigungen = {}; }
             }
+            u.eegs = zuweisungen.filter(z => z.user_id === u.id).map(z => ({ id: z.eeg_id, name: z.eeg_name }));
         });
+
         res.json(users);
     } catch (err) {
         res.status(500).json({ error: 'Serverfehler' });
@@ -110,21 +119,25 @@ router.get('/users', async (req, res) => {
 // POST /api/super-admin/users
 router.post('/users', async (req, res) => {
     try {
-        const { username, password, email, rolle, eeg_id, berechtigungen } = req.body;
+        const { username, password, email, rolle, eeg_ids, berechtigungen } = req.body;
 
         if (!username || !password || !email) {
             return res.status(400).json({ error: 'Username, Passwort und E-Mail erforderlich' });
         }
 
         const hash = await bcrypt.hash(password, 12);
-
-        await pool.query(
-            'INSERT INTO eeg_admin_users (username, email, password_hash, rolle, eeg_id, berechtigungen) VALUES (?, ?, ?, ?, ?, ?)',
+        const [result] = await pool.query(
+            'INSERT INTO eeg_admin_users (username, email, password_hash, rolle, berechtigungen) VALUES (?, ?, ?, ?, ?)',
             [username.trim(), email.trim(), hash,
              rolle === 'super_admin' ? 'super_admin' : 'eeg_admin',
-             eeg_id || null,
              berechtigungen ? JSON.stringify(berechtigungen) : JSON.stringify({ antraege: true, mitglieder: true, export: true, einstellungen: true })]
         );
+
+        // EEG-Zuweisungen speichern
+        const ids = Array.isArray(eeg_ids) ? eeg_ids.filter(Boolean) : [];
+        for (const eid of ids) {
+            await pool.query('INSERT IGNORE INTO eeg_admin_user_eegs (user_id, eeg_id) VALUES (?, ?)', [result.insertId, eid]);
+        }
 
         res.json({ success: true });
     } catch (err) {
@@ -138,21 +151,27 @@ router.post('/users', async (req, res) => {
 // PUT /api/super-admin/users/:id
 router.put('/users/:id', async (req, res) => {
     try {
-        const { email, password, rolle, eeg_id, berechtigungen, aktiv } = req.body;
+        const { email, password, rolle, eeg_ids, berechtigungen, aktiv } = req.body;
+        const uid = req.params.id;
 
         if (password && password.length > 0) {
             const hash = await bcrypt.hash(password, 12);
             await pool.query(
-                'UPDATE eeg_admin_users SET email=?, password_hash=?, rolle=?, eeg_id=?, berechtigungen=?, aktiv=? WHERE id=?',
-                [email, hash, rolle || 'eeg_admin', eeg_id || null,
-                 JSON.stringify(berechtigungen || {}), aktiv !== undefined ? aktiv : 1, req.params.id]
+                'UPDATE eeg_admin_users SET email=?, password_hash=?, rolle=?, berechtigungen=?, aktiv=? WHERE id=?',
+                [email, hash, rolle || 'eeg_admin', JSON.stringify(berechtigungen || {}), aktiv !== undefined ? aktiv : 1, uid]
             );
         } else {
             await pool.query(
-                'UPDATE eeg_admin_users SET email=?, rolle=?, eeg_id=?, berechtigungen=?, aktiv=? WHERE id=?',
-                [email, rolle || 'eeg_admin', eeg_id || null,
-                 JSON.stringify(berechtigungen || {}), aktiv !== undefined ? aktiv : 1, req.params.id]
+                'UPDATE eeg_admin_users SET email=?, rolle=?, berechtigungen=?, aktiv=? WHERE id=?',
+                [email, rolle || 'eeg_admin', JSON.stringify(berechtigungen || {}), aktiv !== undefined ? aktiv : 1, uid]
             );
+        }
+
+        // EEG-Zuweisungen aktualisieren
+        await pool.query('DELETE FROM eeg_admin_user_eegs WHERE user_id = ?', [uid]);
+        const ids = Array.isArray(eeg_ids) ? eeg_ids.filter(Boolean) : [];
+        for (const eid of ids) {
+            await pool.query('INSERT IGNORE INTO eeg_admin_user_eegs (user_id, eeg_id) VALUES (?, ?)', [uid, eid]);
         }
 
         res.json({ success: true });

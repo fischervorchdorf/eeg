@@ -7,6 +7,7 @@ const { tenantResolver, getTenantBySlug } = require('../middleware/tenantResolve
 const { generatePassphrase } = require('../utils/passphrase');
 const { validateStep, validateZaehlpunkt, validateEmail } = require('../utils/validators');
 const { uploadFile } = require('../utils/s3-client');
+const { generatePreviewPdf } = require('../utils/pdf-preview');
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -516,6 +517,87 @@ router.get('/:id/resume', requirePassphrase, async (req, res) => {
     } catch (err) {
         console.error('[ONBOARDING] Resume:', err.message);
         res.status(500).json({ error: 'Serverfehler' });
+    }
+});
+
+// GET /api/onboarding/default-eeg - Standard-Tenant zurueckgeben (wenn nur einer existiert)
+router.get('/default-eeg', async (req, res) => {
+    try {
+        const [rows] = await pool.query(
+            'SELECT id, slug, name FROM eeg_tenants WHERE aktiv = 1 ORDER BY id LIMIT 2'
+        );
+        if (rows.length === 0) {
+            return res.status(404).json({ error: 'Keine EEG konfiguriert' });
+        }
+        // Wenn mehrere existieren, soll der User explizit per ?eeg= waehlen
+        if (rows.length > 1) {
+            return res.json({ multiple: true });
+        }
+        // Vollstaendige Tenant-Daten ueber slug-Endpoint laden
+        const { getTenantBySlug } = require('../middleware/tenantResolver');
+        const tenant = await getTenantBySlug(rows[0].slug);
+        res.json({
+            id: tenant.id, name: tenant.name, slug: tenant.slug, sitz: tenant.sitz,
+            farbe_primary: tenant.farbe_primary, farbe_secondary: tenant.farbe_secondary,
+            logo_url: tenant.logo_url, background_url: tenant.background_url,
+            eintrittsbeitrag_ct: tenant.eintrittsbeitrag_ct,
+            zusatz_zaehlpunkt_ct: tenant.zusatz_zaehlpunkt_ct,
+            preis_erzeugung_ct: tenant.preis_erzeugung_ct,
+            preis_verbrauch_ct: tenant.preis_verbrauch_ct,
+            mwst_satz: tenant.mwst_satz,
+            statuten_url: tenant.statuten_url, agb_url: tenant.agb_url, datenschutz_url: tenant.datenschutz_url,
+            creditor_id: tenant.creditor_id, kontakt_email: tenant.kontakt_email
+        });
+    } catch (err) {
+        console.error('[ONBOARDING] default-eeg:', err.message);
+        res.status(500).json({ error: 'Serverfehler' });
+    }
+});
+
+// HEAD /api/onboarding/:id/exists - Leichtgewichtiger Existenz-Check (Stale-Session)
+router.get('/:id/exists', async (req, res) => {
+    try {
+        const passphrase = req.headers['x-passphrase'] || req.query.passphrase;
+        if (!passphrase) return res.status(401).json({ exists: false });
+
+        const [apps] = await pool.query(
+            'SELECT id, passphrase_hash, status FROM eeg_applications WHERE id = ?',
+            [parseInt(req.params.id)]
+        );
+        if (apps.length === 0) return res.status(404).json({ exists: false });
+
+        const match = await bcrypt.compare(passphrase, apps[0].passphrase_hash);
+        if (!match) return res.status(401).json({ exists: false });
+
+        res.json({ exists: true, status: apps[0].status });
+    } catch (err) {
+        res.status(500).json({ exists: false });
+    }
+});
+
+// GET /api/onboarding/:id/preview-pdf - PDF-Vorschau des Antrags
+router.get('/:id/preview-pdf', requirePassphrase, async (req, res) => {
+    try {
+        const [apps] = await pool.query(
+            `SELECT a.*, t.name as eeg_name FROM eeg_applications a
+             JOIN eeg_tenants t ON a.eeg_id = t.id
+             WHERE a.id = ?`,
+            [req.params.id]
+        );
+        if (apps.length === 0) return res.status(404).json({ error: 'Antrag nicht gefunden' });
+
+        const [zaehlpunkte] = await pool.query(
+            'SELECT * FROM eeg_zaehlpunkte WHERE application_id = ?',
+            [req.params.id]
+        );
+
+        const pdfBuffer = await generatePreviewPdf(apps[0], zaehlpunkte, apps[0].eeg_name);
+        res.set('Content-Type', 'application/pdf');
+        res.set('Content-Disposition', `inline; filename="antrag-${req.params.id}-vorschau.pdf"`);
+        res.send(pdfBuffer);
+    } catch (err) {
+        console.error('[ONBOARDING] PDF-Preview:', err.message);
+        res.status(500).json({ error: 'PDF-Generierung fehlgeschlagen' });
     }
 });
 

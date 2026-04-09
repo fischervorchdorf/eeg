@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="/css/onboarding.css">
 </head>
 <body>
+    <canvas id="solarCanvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
     <div class="bg-overlay"></div>
 
     <div class="container">
@@ -17,7 +18,7 @@
         <main class="status-content">
             <!-- Login -->
             <div id="statusLogin" class="card">
-                <h2>Antragsstatus pruefen</h2>
+                <h2>Antragsstatus prüfen</h2>
                 <p>Gib deine E-Mail-Adresse und deine Passphrase ein, um den Status deines Antrags einzusehen.</p>
 
                 <div class="form-section">
@@ -29,7 +30,7 @@
                         <label for="statusPassphrase">Passphrase</label>
                         <input type="text" id="statusPassphrase" placeholder="wort-wort-wort-wort-wort">
                     </div>
-                    <button class="btn btn-primary" id="btnStatusCheck">Status pruefen</button>
+                    <button class="btn btn-primary" id="btnStatusCheck">Status prüfen</button>
                     <p id="statusError" class="error-text" style="display:none"></p>
                 </div>
             </div>
@@ -63,19 +64,30 @@
 
                 <div class="status-actions">
                     <button class="btn btn-secondary" id="btnDsgvoAuskunft">Datenauskunft (Art. 15 DSGVO)</button>
-                    <button class="btn" id="btnBack2">Zurueck</button>
+                    <button class="btn" id="btnBack2">Zurück</button>
                 </div>
             </div>
         </main>
     </div>
 
+    <script src="/js/solar-bg.js"></script>
     <script>
+        // EEG-Name aus localStorage laden
+        try {
+            const cfg = JSON.parse(localStorage.getItem('eeg_config') || '{}');
+            if (cfg.name) {
+                document.getElementById('eegName').textContent = cfg.name;
+                document.title = cfg.name + ' – Antragsstatus';
+            }
+            if (cfg.farbe_primary) document.documentElement.style.setProperty('--primary', cfg.farbe_primary);
+        } catch(e) {}
+
         document.getElementById('btnStatusCheck').addEventListener('click', async () => {
             const email = document.getElementById('statusEmail').value;
             const passphrase = document.getElementById('statusPassphrase').value;
             const errorEl = document.getElementById('statusError');
 
-            if (!email || !passphrase) { errorEl.textContent = 'Bitte alle Felder ausfuellen'; errorEl.style.display = 'block'; return; }
+            if (!email || !passphrase) { errorEl.textContent = 'Bitte alle Felder ausfüllen'; errorEl.style.display = 'block'; return; }
 
             try {
                 const res = await fetch('/api/applicant/login', {

@@ -5,15 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Einstellungen - EEG Admin</title>
     <link rel="stylesheet" href="/admin/css/admin.css">
+    <script src="/admin/js/admin-common.js"></script>
 </head>
 <body>
     <nav class="sidebar" id="sidebar">
         <div class="sidebar-header"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/></svg><span>EEG-Portal</span></div>
         <ul class="sidebar-nav">
             <li><a href="/admin/dashboard.html">Dashboard</a></li>
-            <li><a href="/admin/applications.html">Antrage</a></li>
+            <li><a href="/admin/applications.html">Anträge</a></li>
             <li><a href="/admin/members.html">Mitglieder</a></li>
             <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/statistik.html">Statistik</a></li>
+            <li><a href="/admin/import.html">Import</a></li>
             <li class="active"><a href="/admin/eeg-settings.html">Einstellungen</a></li>
         </ul>
         <div class="sidebar-footer"><span id="adminName"></span><button class="btn-logout" id="btnLogout">Abmelden</button></div>
@@ -103,6 +106,7 @@
             const auth = await fetch('/api/auth/me').then(r=>r.json());
             if (!auth.id) { window.location.href = '/admin/'; return; }
             document.getElementById('adminName').textContent = auth.username;
+            injectSuperAdminNav(auth);
 
             const res = await fetch('/api/admin/eeg/settings');
             const s = await res.json();

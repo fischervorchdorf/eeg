@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Statistik - EEG Admin</title>
+    <link rel="stylesheet" href="/admin/css/admin.css">
+    <script src="/admin/js/admin-common.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .kpi-card {
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem 1rem;
+            text-align: center;
+            transition: box-shadow 0.2s;
+        }
+        .kpi-card:hover { box-shadow: var(--shadow-lg); }
+        .kpi-icon {
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+            display: block;
+        }
+        .kpi-value {
+            font-size: 1.9rem;
+            font-weight: 800;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 0.25rem;
+        }
+        .kpi-unit {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .kpi-label {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            margin-top: 0.2rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+        .chart-card {
+            background: var(--bg-white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1.25rem;
+        }
+        .chart-card.full { grid-column: 1 / -1; }
+        .chart-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--text-muted);
+            margin-bottom: 1rem;
+        }
+        .chart-wrap {
+            position: relative;
+            height: 260px;
+        }
+        .chart-wrap.tall { height: 320px; }
+
+        .no-data {
+            display: flex; align-items: center; justify-content: center;
+            height: 200px; color: var(--text-light); font-size: 0.9rem;
+        }
+
+        .page-subtitle {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid { grid-template-columns: 1fr; }
+            .chart-card.full { grid-column: 1; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+            <span>EEG-Portal</span>
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/admin/dashboard.html">Dashboard</a></li>
+            <li><a href="/admin/applications.html">Anträge</a></li>
+            <li><a href="/admin/members.html">Mitglieder</a></li>
+            <li class="active"><a href="/admin/statistik.html">Statistik</a></li>
+            <li><a href="/admin/import.html">Import</a></li>
+            <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span id="adminName"></span>
+            <button class="btn-logout" id="btnLogout">Abmelden</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Statistik</h1>
+            <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
+        </div>
+        <p class="page-subtitle" id="pageSubtitle">Lade Daten…</p>
+
+        <!-- KPI Karten -->
+        <div class="kpi-grid">
+            <div class="kpi-card">
+                <span class="kpi-icon">👥</span>
+                <div class="kpi-value" id="kpiMitglieder">—</div>
+                <div class="kpi-unit"></div>
+                <div class="kpi-label">Mitglieder</div>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-icon">⚡</span>
+                <div class="kpi-value" id="kpiZpBezug">—</div>
+                <div class="kpi-unit">Bezug</div>
+                <div class="kpi-label">Zählpunkte</div>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-icon">☀️</span>
+                <div class="kpi-value" id="kpiZpEinspeisung">—</div>
+                <div class="kpi-unit">Einspeisung</div>
+                <div class="kpi-label">Zählpunkte</div>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-icon">🔆</span>
+                <div class="kpi-value" id="kpiPv">—</div>
+                <div class="kpi-unit">kWp</div>
+                <div class="kpi-label">PV-Leistung</div>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-icon">🔋</span>
+                <div class="kpi-value" id="kpiSpeicher">—</div>
+                <div class="kpi-unit">kWh</div>
+                <div class="kpi-label">Speicherkapazität</div>
+            </div>
+            <div class="kpi-card">
+                <span class="kpi-icon">📊</span>
+                <div class="kpi-value" id="kpiVerbrauch">—</div>
+                <div class="kpi-unit">kWh/a</div>
+                <div class="kpi-label">Jahresverbrauch</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+
+            <!-- Mitgliederwachstum -->
+            <div class="chart-card full">
+                <div class="chart-title">📈 Mitgliederwachstum (kumulativ)</div>
+                <div class="chart-wrap tall">
+                    <canvas id="chartWachstum"></canvas>
+                </div>
+            </div>
+
+            <!-- Mitglieder nach Typ -->
+            <div class="chart-card">
+                <div class="chart-title">🥧 Mitglieder nach Typ</div>
+                <div class="chart-wrap">
+                    <canvas id="chartTyp"></canvas>
+                </div>
+            </div>
+
+            <!-- Anträge pro Monat -->
+            <div class="chart-card">
+                <div class="chart-title">📋 Anträge pro Monat</div>
+                <div class="chart-wrap">
+                    <canvas id="chartAntraege"></canvas>
+                </div>
+            </div>
+
+            <!-- PV-Leistung Wachstum -->
+            <div class="chart-card full">
+                <div class="chart-title">☀️ PV-Leistung kumulativ (kWp)</div>
+                <div class="chart-wrap tall">
+                    <canvas id="chartPv"></canvas>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+    // Hilfsfunktionen
+    function fmt(n) {
+        if (n === null || n === undefined) return '0';
+        return Number(n).toLocaleString('de-AT');
+    }
+
+    function monatLabel(ym) {
+        const [y, m] = ym.split('-');
+        const names = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+        return `${names[parseInt(m)-1]} ${y.slice(2)}`;
+    }
+
+    // Chart-Defaults
+    Chart.defaults.font.family = "'Segoe UI', system-ui, sans-serif";
+    Chart.defaults.color = '#64748b';
+    Chart.defaults.plugins.legend.labels.boxWidth = 12;
+    Chart.defaults.plugins.legend.labels.padding = 16;
+
+    const COLORS = {
+        primary: '#1a73e8',
+        green:   '#00a86b',
+        orange:  '#f59e0b',
+        red:     '#ef4444',
+        purple:  '#8b5cf6',
+        teal:    '#0d9488',
+        blue2:   '#3b82f6',
+    };
+
+    async function load() {
+        const res = await fetch('/api/admin/dashboard/statistik');
+        if (!res.ok) {
+            document.getElementById('pageSubtitle').textContent = 'Fehler beim Laden der Statistik.';
+            return;
+        }
+        const d = await res.json();
+        const { kpi, mitglieder_wachstum, nach_typ, antraege_pro_monat, pv_wachstum } = d;
+
+        document.getElementById('pageSubtitle').textContent =
+            `Stand: ${new Date().toLocaleDateString('de-AT', {day:'2-digit', month:'long', year:'numeric'})}`;
+
+        // KPIs
+        document.getElementById('kpiMitglieder').textContent = fmt(kpi.mitglieder);
+        document.getElementById('kpiZpBezug').textContent = fmt(kpi.zp_bezug);
+        document.getElementById('kpiZpEinspeisung').textContent = fmt(kpi.zp_einspeisung);
+        document.getElementById('kpiPv').textContent = fmt(kpi.pv_leistung_kwp);
+        document.getElementById('kpiSpeicher').textContent = fmt(kpi.speicher_kwh);
+        document.getElementById('kpiVerbrauch').textContent = fmt(kpi.jahresverbrauch_kwh);
+
+        // 1. Mitgliederwachstum (Line)
+        if (mitglieder_wachstum.length > 0) {
+            new Chart(document.getElementById('chartWachstum'), {
+                type: 'line',
+                data: {
+                    labels: mitglieder_wachstum.map(m => monatLabel(m.monat)),
+                    datasets: [{
+                        label: 'Mitglieder gesamt',
+                        data: mitglieder_wachstum.map(m => m.gesamt),
+                        borderColor: COLORS.primary,
+                        backgroundColor: 'rgba(26,115,232,0.08)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 2.5,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            grid: { color: '#f1f5f9' },
+                            ticks: { precision: 0 }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        } else {
+            document.getElementById('chartWachstum').parentElement.innerHTML =
+                '<div class="no-data">Noch keine Daten vorhanden</div>';
+        }
+
+        // 2. Mitglieder nach Typ (Donut)
+        if (nach_typ.length > 0) {
+            const typeColors = [COLORS.primary, COLORS.green, COLORS.orange, COLORS.purple, COLORS.teal];
+            new Chart(document.getElementById('chartTyp'), {
+                type: 'doughnut',
+                data: {
+                    labels: nach_typ.map(t => t.typ),
+                    datasets: [{
+                        data: nach_typ.map(t => t.count),
+                        backgroundColor: typeColors.slice(0, nach_typ.length),
+                        borderWidth: 2,
+                        borderColor: '#fff',
+                        hoverOffset: 8
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    cutout: '65%',
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ` ${ctx.label}: ${ctx.parsed} Mitglieder`
+                            }
+                        }
+                    }
+                }
+            });
+        } else {
+            document.getElementById('chartTyp').parentElement.innerHTML =
+                '<div class="no-data">Noch keine Daten vorhanden</div>';
+        }
+
+        // 3. Anträge pro Monat (Stacked Bar)
+        if (antraege_pro_monat.length > 0) {
+            new Chart(document.getElementById('chartAntraege'), {
+                type: 'bar',
+                data: {
+                    labels: antraege_pro_monat.map(m => monatLabel(m.monat)),
+                    datasets: [
+                        {
+                            label: 'Genehmigt',
+                            data: antraege_pro_monat.map(m => m.genehmigt),
+                            backgroundColor: 'rgba(0,168,107,0.8)',
+                            borderRadius: 4,
+                            stack: 'a'
+                        },
+                        {
+                            label: 'Offen',
+                            data: antraege_pro_monat.map(m => m.offen),
+                            backgroundColor: 'rgba(26,115,232,0.7)',
+                            borderRadius: 4,
+                            stack: 'a'
+                        },
+                        {
+                            label: 'Abgelehnt',
+                            data: antraege_pro_monat.map(m => m.abgelehnt),
+                            backgroundColor: 'rgba(239,68,68,0.6)',
+                            borderRadius: 4,
+                            stack: 'a'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { precision: 0 } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        } else {
+            document.getElementById('chartAntraege').parentElement.innerHTML =
+                '<div class="no-data">Noch keine Daten vorhanden</div>';
+        }
+
+        // 4. PV-Leistung kumulativ (Area)
+        if (pv_wachstum.length > 0) {
+            new Chart(document.getElementById('chartPv'), {
+                type: 'line',
+                data: {
+                    labels: pv_wachstum.map(m => monatLabel(m.monat)),
+                    datasets: [{
+                        label: 'PV-Leistung kWp',
+                        data: pv_wachstum.map(m => m.kwp),
+                        borderColor: COLORS.orange,
+                        backgroundColor: 'rgba(245,158,11,0.1)',
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointHoverRadius: 6,
+                        borderWidth: 2.5,
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: v => v.toLocaleString('de-AT') + ' kWp'
+                            }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        } else {
+            document.getElementById('chartPv').parentElement.innerHTML =
+                '<div class="no-data">Noch keine PV-Daten vorhanden</div>';
+        }
+    }
+
+    // Logout & Sidebar
+    document.getElementById('btnLogout').addEventListener('click', async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/admin/';
+    });
+    document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('open');
+    });
+
+    // Auth + Load
+    (async () => {
+        const res = await fetch('/api/auth/me');
+        const user = await res.json();
+        if (!user.id) { window.location.href = '/admin/'; return; }
+        document.getElementById('adminName').textContent = user.username;
+        injectSuperAdminNav(user);
+        load();
+    })();
+    </script>
+</body>
+</html>

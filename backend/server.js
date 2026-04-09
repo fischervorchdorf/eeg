@@ -99,7 +99,11 @@ const adminMembersRouter = require('./src/routes/admin-members');
 const adminEegRouter = require('./src/routes/admin-eeg');
 const adminExportRouter = require('./src/routes/admin-export');
 const adminDashboardRouter = require('./src/routes/admin-dashboard');
+const adminImportRouter = require('./src/routes/admin-import');
 const superAdminRouter = require('./src/routes/super-admin');
+const autofillRouter = require('./src/routes/autofill');
+const ocrRouter = require('./src/routes/ocr');
+const emailVerifyRouter = require('./src/routes/email-verify');
 
 // Auth
 app.use('/api/auth', loginLimiter, authRouter);
@@ -107,6 +111,9 @@ app.use('/api/auth', loginLimiter, authRouter);
 // Oeffentliche Onboarding-Routen
 app.use('/api/onboarding', onboardingLimiter, onboardingRouter);
 app.use('/api/applicant', applicantRouter);
+app.use('/api/autofill', autofillRouter);
+app.use('/api/ocr', ocrRouter);
+app.use('/api/email-verify', emailVerifyRouter);
 
 // Admin-Routen (geschuetzt durch requireLogin Middleware in den Routern)
 app.use('/api/admin/applications', adminApplicationsRouter);
@@ -114,6 +121,7 @@ app.use('/api/admin/members', adminMembersRouter);
 app.use('/api/admin/eeg', adminEegRouter);
 app.use('/api/admin/export', adminExportRouter);
 app.use('/api/admin/dashboard', adminDashboardRouter);
+app.use('/api/admin/import', adminImportRouter);
 app.use('/api/super-admin', superAdminRouter);
 
 // Root -> Frontend

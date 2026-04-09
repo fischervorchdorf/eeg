@@ -5,18 +5,142 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mitglieder - EEG Admin</title>
     <link rel="stylesheet" href="/admin/css/admin.css">
+    <script src="/admin/js/admin-common.js"></script>
+    <style>
+        /* ---- Tabelle ---- */
+        .member-row { cursor: pointer; transition: background 0.15s; }
+        .member-row:hover td { background: var(--primary-light) !important; }
+        .member-row.selected td { background: #dbeafe !important; }
+
+        .badge {
+            display: inline-block; padding: 3px 10px; border-radius: 20px;
+            font-size: 0.75rem; font-weight: 600; letter-spacing: 0.03em;
+        }
+        .badge-aktiv    { background: #d1fae5; color: #065f46; }
+        .badge-typ      { background: #ede9fe; color: #5b21b6; }
+
+        /* ---- Detail-Panel ---- */
+        .detail-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.3);
+            z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+        }
+        .detail-overlay.open { opacity: 1; pointer-events: all; }
+
+        .detail-panel {
+            position: fixed; top: 0; right: 0; bottom: 0; width: 680px; max-width: 95vw;
+            background: var(--bg); z-index: 201; display: flex; flex-direction: column;
+            transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+            box-shadow: -4px 0 24px rgba(0,0,0,0.12);
+        }
+        .detail-panel.open { transform: translateX(0); }
+
+        .panel-header {
+            display: flex; align-items: center; gap: 1rem;
+            padding: 1.25rem 1.5rem; background: var(--bg-white);
+            border-bottom: 1px solid var(--border); flex-shrink: 0;
+        }
+        .panel-header-avatar {
+            width: 48px; height: 48px; border-radius: 50%;
+            background: var(--primary-light); color: var(--primary);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem; font-weight: 700; flex-shrink: 0;
+        }
+        .panel-header-info h2 { font-size: 1.1rem; font-weight: 700; margin-bottom: 2px; }
+        .panel-header-info p  { font-size: 0.82rem; color: var(--text-muted); }
+        .panel-close {
+            margin-left: auto; background: none; border: none; cursor: pointer;
+            width: 36px; height: 36px; border-radius: 8px; display: flex;
+            align-items: center; justify-content: center; color: var(--text-muted);
+            font-size: 1.2rem; transition: background 0.15s;
+        }
+        .panel-close:hover { background: var(--border); color: var(--text); }
+
+        .panel-body { flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem; }
+
+        /* Sektionen */
+        .detail-section {
+            background: var(--bg-white); border-radius: var(--radius);
+            border: 1px solid var(--border); margin-bottom: 1rem; overflow: hidden;
+        }
+        .detail-section-title {
+            font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em;
+            text-transform: uppercase; color: var(--text-muted);
+            padding: 0.75rem 1rem 0.5rem; border-bottom: 1px solid var(--border);
+            background: #f8fafc;
+        }
+        .detail-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+        }
+        .detail-field {
+            padding: 0.6rem 1rem; border-bottom: 1px solid var(--border);
+        }
+        .detail-field:last-child, .detail-field:nth-last-child(2):nth-child(odd) {
+            border-bottom: none;
+        }
+        .detail-field.full { grid-column: 1 / -1; }
+        .detail-field label {
+            display: block; font-size: 0.72rem; font-weight: 600;
+            color: var(--text-muted); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.04em;
+        }
+        .detail-field span {
+            font-size: 0.9rem; color: var(--text); font-weight: 500;
+        }
+        .detail-field span.empty { color: var(--text-light); font-weight: 400; font-style: italic; }
+
+        /* Zählpunkte */
+        .zp-list { padding: 0.5rem 1rem 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .zp-card {
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 0.65rem 0.9rem; display: flex; flex-direction: column; gap: 2px;
+        }
+        .zp-card-top { display: flex; align-items: center; gap: 0.5rem; }
+        .zp-nr { font-weight: 700; font-size: 0.85rem; color: var(--text); }
+        .zp-badge-bezug     { background: #dbeafe; color: #1e40af; }
+        .zp-badge-einspeisung { background: #d1fae5; color: #065f46; }
+        .zp-nummer { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); }
+        .zp-adresse { font-size: 0.8rem; color: var(--text-muted); }
+
+        /* Status-Indikator oben */
+        .status-bar {
+            display: flex; gap: 1rem; padding: 0.75rem 1rem;
+            background: #f8fafc; flex-wrap: wrap;
+        }
+        .status-item { display: flex; flex-direction: column; gap: 2px; }
+        .status-item label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+        .status-item span  { font-size: 0.82rem; font-weight: 600; color: var(--text); }
+
+        /* Aktionen */
+        .panel-actions {
+            display: flex; gap: 0.75rem; padding: 1rem 1.5rem;
+            border-top: 1px solid var(--border); background: var(--bg-white); flex-shrink: 0;
+        }
+        .btn-danger { background: #fee2e2; color: var(--error); border: 1px solid #fecaca; }
+        .btn-danger:hover { background: #fecaca; }
+
+        /* Toolbar */
+        .toolbar-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; }
+        .toolbar-count { font-size: 0.85rem; color: var(--text-muted); margin-left: auto; }
+    </style>
 </head>
 <body>
     <nav class="sidebar" id="sidebar">
-        <div class="sidebar-header"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/></svg><span>EEG-Portal</span></div>
+        <div class="sidebar-header">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+            <span>EEG-Portal</span>
+        </div>
         <ul class="sidebar-nav">
             <li><a href="/admin/dashboard.html">Dashboard</a></li>
-            <li><a href="/admin/applications.html">Antrage</a></li>
+            <li><a href="/admin/applications.html">Anträge</a></li>
             <li class="active"><a href="/admin/members.html">Mitglieder</a></li>
             <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/statistik.html">Statistik</a></li>
+            <li><a href="/admin/import.html">Import</a></li>
             <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
         </ul>
-        <div class="sidebar-footer"><span id="adminName"></span><button class="btn-logout" id="btnLogout">Abmelden</button></div>
+        <div class="sidebar-footer">
+            <span id="adminName"></span>
+            <button class="btn-logout" id="btnLogout">Abmelden</button>
+        </div>
     </nav>
 
     <main class="main-content">
@@ -25,8 +149,9 @@
             <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
         </div>
 
-        <div class="toolbar">
-            <input type="text" id="searchInput" placeholder="Suche..." class="toolbar-search">
+        <div class="toolbar-row">
+            <input type="text" id="searchInput" placeholder="🔍  Name, E-Mail suchen..." class="toolbar-search" style="max-width:320px;">
+            <span class="toolbar-count" id="memberCount"></span>
         </div>
 
         <div class="table-container">
@@ -36,10 +161,9 @@
                         <th>Name</th>
                         <th>Typ</th>
                         <th>E-Mail</th>
-                        <th>PLZ/Ort</th>
-                        <th>IBAN</th>
-                        <th>Zaehlpunkte</th>
-                        <th>Seit</th>
+                        <th>PLZ / Ort</th>
+                        <th>Zählpunkte</th>
+                        <th>Mitglied seit</th>
                     </tr>
                 </thead>
                 <tbody id="membersBody"></tbody>
@@ -47,34 +171,268 @@
         </div>
     </main>
 
+    <!-- Detail-Overlay + Panel -->
+    <div class="detail-overlay" id="overlay"></div>
+    <aside class="detail-panel" id="detailPanel">
+        <div class="panel-header" id="panelHeader">
+            <div class="panel-header-avatar" id="panelAvatar"></div>
+            <div class="panel-header-info">
+                <h2 id="panelName"></h2>
+                <p id="panelSubtitle"></p>
+            </div>
+            <button class="panel-close" id="btnClosePanel">✕</button>
+        </div>
+        <div class="panel-body" id="panelBody">
+            <div style="text-align:center;padding:3rem;color:var(--text-muted)">Lade...</div>
+        </div>
+        <div class="panel-actions" id="panelActions" style="display:none">
+            <button class="btn btn-danger" id="btnKuendigung">Kündigung einleiten</button>
+        </div>
+    </aside>
+
     <script>
-        async function load() {
-            const res = await fetch('/api/auth/me');
-            const user = await res.json();
-            if (!user.id) { window.location.href = '/admin/'; return; }
-            document.getElementById('adminName').textContent = user.username;
+    let allMembers = [];
+    let currentMemberId = null;
 
-            const search = document.getElementById('searchInput').value;
-            const mRes = await fetch(`/api/admin/members?search=${encodeURIComponent(search)}`);
-            const data = await mRes.json();
+    // --- Formatierungen ---
+    const fmt = {
+        date: d => d ? new Date(d).toLocaleDateString('de-AT', {day:'2-digit',month:'2-digit',year:'numeric'}) : null,
+        iban: i => i ? i.replace(/\s/g,'').replace(/(.{4})/g,'$1 ').trim() : null,
+        val: (v, fallback='—') => (v !== null && v !== undefined && v !== '') ? v : fallback,
+        empty: v => (v === null || v === undefined || v === '') ? '<span class="empty">—</span>' : `<span>${v}</span>`
+    };
 
-            document.getElementById('membersBody').innerHTML = (data.members || []).map(m => `
-                <tr>
-                    <td><strong>${m.firmenname || `${m.vorname} ${m.nachname}`}</strong></td>
-                    <td>${m.member_type}</td>
-                    <td>${m.email || '-'}</td>
-                    <td>${m.plz || ''} ${m.ort || ''}</td>
-                    <td>${m.iban ? m.iban.replace(/(.{4})/g, '$1 ').trim() : '-'}</td>
-                    <td>${[m.zp_bezug, m.zp_einspeisung].filter(Boolean).join(', ') || '-'}</td>
-                    <td>${m.genehmigt_am ? new Date(m.genehmigt_am).toLocaleDateString('de-AT') : '-'}</td>
-                </tr>
-            `).join('');
+    function field(label, value) {
+        const display = (value !== null && value !== undefined && value !== '')
+            ? `<span>${value}</span>`
+            : `<span class="empty">nicht angegeben</span>`;
+        return `<div class="detail-field"><label>${label}</label>${display}</div>`;
+    }
+    function fieldFull(label, value) {
+        const display = (value !== null && value !== undefined && value !== '')
+            ? `<span>${value}</span>`
+            : `<span class="empty">nicht angegeben</span>`;
+        return `<div class="detail-field full"><label>${label}</label>${display}</div>`;
+    }
+
+    // --- Mitgliederliste laden ---
+    async function load() {
+        const search = document.getElementById('searchInput').value;
+        const res = await fetch(`/api/admin/members?search=${encodeURIComponent(search)}&limit=500`);
+        const data = await res.json();
+        allMembers = data.members || [];
+
+        document.getElementById('memberCount').textContent = `${allMembers.length} Mitglied${allMembers.length !== 1 ? 'er' : ''}`;
+
+        document.getElementById('membersBody').innerHTML = allMembers.map(m => {
+            const name = m.firmenname || `${m.vorname || ''} ${m.nachname || ''}`.trim();
+            const zpCount = [m.zp_bezug, m.zp_einspeisung].filter(Boolean).join(',').split(',').filter(Boolean).length;
+            return `<tr class="member-row" data-id="${m.id}">
+                <td><strong>${name}</strong></td>
+                <td><span class="badge badge-typ">${m.member_type}</span></td>
+                <td style="color:var(--text-muted)">${m.email || '—'}</td>
+                <td>${m.plz || ''} ${m.ort || ''}</td>
+                <td>${zpCount > 0 ? `<span class="badge" style="background:#f0f9ff;color:#0369a1">${zpCount} Zählpunkt${zpCount!==1?'e':''}</span>` : '<span style="color:var(--text-light)">—</span>'}</td>
+                <td style="color:var(--text-muted)">${fmt.date(m.genehmigt_am) || '—'}</td>
+            </tr>`;
+        }).join('');
+
+        document.querySelectorAll('.member-row').forEach(row => {
+            row.addEventListener('click', () => openDetail(parseInt(row.dataset.id)));
+        });
+    }
+
+    // --- Detail-Panel öffnen ---
+    async function openDetail(id) {
+        currentMemberId = id;
+        document.querySelectorAll('.member-row').forEach(r => r.classList.toggle('selected', parseInt(r.dataset.id) === id));
+        document.getElementById('overlay').classList.add('open');
+        document.getElementById('detailPanel').classList.add('open');
+        document.getElementById('panelBody').innerHTML = '<div style="text-align:center;padding:3rem;color:var(--text-muted)">Lade...</div>';
+        document.getElementById('panelActions').style.display = 'none';
+
+        const res = await fetch(`/api/admin/members/${id}`);
+        if (!res.ok) { document.getElementById('panelBody').innerHTML = '<div style="padding:2rem;color:var(--error)">Fehler beim Laden</div>'; return; }
+        const { member: m, zaehlpunkte: zps } = await res.json();
+
+        // Header
+        const name = m.firmenname || `${m.vorname || ''} ${m.nachname || ''}`.trim();
+        const initials = m.firmenname ? m.firmenname.slice(0,2).toUpperCase() : `${(m.vorname||'?')[0]}${(m.nachname||'?')[0]}`.toUpperCase();
+        document.getElementById('panelAvatar').textContent = initials;
+        document.getElementById('panelName').textContent = name;
+        document.getElementById('panelSubtitle').textContent = `${m.member_type} · ${m.email || 'keine E-Mail'}`;
+
+        // Zählpunkte aufteilen
+        const zpBezug = zps.filter(z => z.typ === 'bezug');
+        const zpEinspeisung = zps.filter(z => z.typ === 'einspeisung');
+
+        document.getElementById('panelBody').innerHTML = `
+
+            <!-- Status-Leiste -->
+            <div class="detail-section">
+                <div class="status-bar">
+                    <div class="status-item">
+                        <label>Status</label>
+                        <span><span class="badge badge-aktiv">${m.status}</span></span>
+                    </div>
+                    <div class="status-item">
+                        <label>Mitglied seit</label>
+                        <span>${fmt.date(m.genehmigt_am) || '—'}</span>
+                    </div>
+                    <div class="status-item">
+                        <label>Antrag eingereicht</label>
+                        <span>${fmt.date(m.eingereicht_am || m.created_at) || '—'}</span>
+                    </div>
+                    <div class="status-item">
+                        <label>Letzte Änderung</label>
+                        <span>${fmt.date(m.updated_at) || '—'}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Allgemeine Informationen -->
+            <div class="detail-section">
+                <div class="detail-section-title">Allgemeine Informationen</div>
+                <div class="detail-grid">
+                    ${m.firmenname ? `
+                        ${fieldFull('Firmenname', m.firmenname)}
+                        ${field('UID-Nummer', m.uid_nummer)}
+                        ${field('Firmenbuchnummer', m.firmenbuchnummer)}
+                    ` : `
+                        ${field('Titel', m.titel)}
+                        ${field('Vorname', m.vorname)}
+                        ${field('Nachname', m.nachname)}
+                        ${field('Postnomen', m.postname)}
+                        ${field('Geburtsdatum', fmt.date(m.geburtsdatum))}
+                        ${field('Identitätsnachweis', m.ausweis_typ)}
+                        ${field('Ausweisnummer', m.ausweisnummer)}
+                    `}
+                    ${fieldFull('Adresse', m.strasse ? `${m.strasse} ${m.hausnummer || ''}, ${m.plz} ${m.ort}` : null)}
+                    ${field('Telefon', m.telefon)}
+                    ${field('E-Mail', m.email)}
+                </div>
+            </div>
+
+            <!-- Bankverbindung -->
+            <div class="detail-section">
+                <div class="detail-section-title">Bankverbindung</div>
+                <div class="detail-grid">
+                    ${field('Kontoinhaber', m.kontoinhaber)}
+                    ${field('IBAN', fmt.iban(m.iban))}
+                    ${field('Bankname', m.bankname)}
+                    ${field('SEPA-Mandat', m.sepa_akzeptiert ? fmt.date(m.sepa_akzeptiert) : null)}
+                </div>
+            </div>
+
+            <!-- Zustimmungen -->
+            <div class="detail-section">
+                <div class="detail-section-title">Zustimmungen</div>
+                <div class="detail-grid">
+                    ${field('Statuten akzeptiert', fmt.date(m.statuten_akzeptiert || m.created_at))}
+                    ${field('Datenschutz akzeptiert', fmt.date(m.datenschutz_akzeptiert || m.created_at))}
+                    ${field('AGB akzeptiert', fmt.date(m.agb_akzeptiert || m.created_at))}
+                    ${field('Netzbetreibervollmacht', fmt.date(m.netzbetreiber_vollmacht || m.created_at))}
+                </div>
+            </div>
+
+            <!-- Zählpunkte Bezug -->
+            ${zpBezug.length > 0 ? `
+            <div class="detail-section">
+                <div class="detail-section-title">Zählpunkte Bezug (${zpBezug.length})</div>
+                <div class="zp-list">
+                    ${zpBezug.map(z => `
+                    <div class="zp-card">
+                        <div class="zp-card-top">
+                            <span class="zp-nr">${z.kurzbezeichnung || '—'}</span>
+                            <span class="badge zp-badge-bezug">Bezug</span>
+                            ${z.aktiv ? '<span class="badge badge-aktiv">Aktiv</span>' : ''}
+                        </div>
+                        <div class="zp-nummer">${z.zaehlpunktnummer || '—'}</div>
+                        <div class="zp-adresse">${[z.strasse, z.hausnummer, z.plz, z.ort].filter(Boolean).join(' ') || '—'}</div>
+                    </div>`).join('')}
+                </div>
+            </div>` : ''}
+
+            <!-- Zählpunkte Einspeisung -->
+            ${zpEinspeisung.length > 0 ? `
+            <div class="detail-section">
+                <div class="detail-section-title">Zählpunkte Einspeisung (${zpEinspeisung.length})</div>
+                <div class="zp-list">
+                    ${zpEinspeisung.map(z => `
+                    <div class="zp-card">
+                        <div class="zp-card-top">
+                            <span class="zp-nr">${z.kurzbezeichnung || '—'}</span>
+                            <span class="badge zp-badge-einspeisung">Einspeisung</span>
+                            ${z.pv_leistung_kwp ? `<span style="font-size:0.78rem;color:var(--text-muted)">${z.pv_leistung_kwp} kWp</span>` : ''}
+                            ${z.aktiv ? '<span class="badge badge-aktiv">Aktiv</span>' : ''}
+                        </div>
+                        <div class="zp-nummer">${z.zaehlpunktnummer || '—'}</div>
+                        <div class="zp-adresse">${[z.strasse, z.hausnummer, z.plz, z.ort].filter(Boolean).join(' ') || '—'}</div>
+                    </div>`).join('')}
+                </div>
+            </div>` : ''}
+
+            ${(zpBezug.length + zpEinspeisung.length) === 0 ? `
+            <div class="detail-section">
+                <div class="detail-section-title">Zählpunkte</div>
+                <div style="padding:1rem;color:var(--text-muted);font-size:0.875rem">Keine Zählpunkte registriert</div>
+            </div>` : ''}
+
+            <!-- Admin-Notiz -->
+            ${m.admin_notiz ? `
+            <div class="detail-section">
+                <div class="detail-section-title">Admin-Notiz</div>
+                <div style="padding:0.75rem 1rem;font-size:0.875rem;white-space:pre-wrap;color:var(--text)">${m.admin_notiz}</div>
+            </div>` : ''}
+        `;
+
+        document.getElementById('panelActions').style.display = 'flex';
+    }
+
+    function closePanel() {
+        document.getElementById('overlay').classList.remove('open');
+        document.getElementById('detailPanel').classList.remove('open');
+        document.querySelectorAll('.member-row').forEach(r => r.classList.remove('selected'));
+        currentMemberId = null;
+    }
+
+    // --- Kündigung ---
+    document.getElementById('btnKuendigung').addEventListener('click', async () => {
+        if (!currentMemberId) return;
+        const grund = prompt('Kündigungsgrund (optional):');
+        if (grund === null) return; // Abgebrochen
+        if (!confirm('Mitgliedschaft wirklich kündigen?')) return;
+
+        const res = await fetch(`/api/admin/members/${currentMemberId}/kuendigung`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ grund })
+        });
+        if (res.ok) {
+            alert('Kündigung wurde eingetragen.');
+            closePanel();
+            load();
+        } else {
+            alert('Fehler beim Speichern.');
         }
+    });
 
-        document.getElementById('searchInput').addEventListener('input', () => { clearTimeout(window._st); window._st = setTimeout(load, 300); });
-        document.getElementById('btnLogout').addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/admin/'; });
-        document.getElementById('btnToggleSidebar')?.addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
+    // --- Events ---
+    document.getElementById('overlay').addEventListener('click', closePanel);
+    document.getElementById('btnClosePanel').addEventListener('click', closePanel);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+    document.getElementById('searchInput').addEventListener('input', () => { clearTimeout(window._st); window._st = setTimeout(load, 300); });
+    document.getElementById('btnLogout').addEventListener('click', async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/admin/'; });
+    document.getElementById('btnToggleSidebar')?.addEventListener('click', () => document.getElementById('sidebar').classList.toggle('open'));
+
+    // --- Init ---
+    (async () => {
+        const res = await fetch('/api/auth/me');
+        const user = await res.json();
+        if (!user.id) { window.location.href = '/admin/'; return; }
+        document.getElementById('adminName').textContent = user.username;
+        injectSuperAdminNav(user);
         load();
+    })();
     </script>
 </body>
 </html>

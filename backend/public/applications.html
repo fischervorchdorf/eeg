@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Antrage - EEG Admin</title>
     <link rel="stylesheet" href="/admin/css/admin.css">
+    <script src="/admin/js/admin-common.js"></script>
 </head>
 <body>
     <nav class="sidebar" id="sidebar">
@@ -14,9 +15,11 @@
         </div>
         <ul class="sidebar-nav">
             <li><a href="/admin/dashboard.html">Dashboard</a></li>
-            <li class="active"><a href="/admin/applications.html">Antrage</a></li>
+            <li class="active"><a href="/admin/applications.html">Anträge</a></li>
             <li><a href="/admin/members.html">Mitglieder</a></li>
             <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/statistik.html">Statistik</a></li>
+            <li><a href="/admin/import.html">Import</a></li>
             <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
         </ul>
         <div class="sidebar-footer">
@@ -86,6 +89,7 @@
             const data = await res.json();
             if (!data.id) { window.location.href = '/admin/'; return null; }
             document.getElementById('adminName').textContent = data.username;
+            injectSuperAdminNav(data);
             return data;
         }
 

@@ -80,6 +80,48 @@ const OnboardingAPI = {
         return res.json();
     },
 
+    // Stale-Session-Check (leichtgewichtig)
+    async checkSession(appId, passphrase) {
+        try {
+            const res = await fetch(`${this.baseUrl}/${appId}/exists`, {
+                headers: { 'X-Passphrase': passphrase }
+            });
+            const data = await res.json();
+            return res.ok && data.exists;
+        } catch (e) { return false; }
+    },
+
+    // Default-Tenant laden (wenn kein ?eeg= Param)
+    async loadDefaultEeg() {
+        const res = await fetch(`${this.baseUrl}/default-eeg`);
+        if (!res.ok) return null;
+        return res.json();
+    },
+
+    // E-Mail-Verifikation
+    async sendVerificationCode(email) {
+        const res = await fetch(`/api/email-verify/${this.applicationId}/send`, {
+            method: 'POST',
+            headers: this.headers(),
+            body: JSON.stringify({ email })
+        });
+        return res.json();
+    },
+
+    async checkVerificationCode(code) {
+        const res = await fetch(`/api/email-verify/${this.applicationId}/check`, {
+            method: 'POST',
+            headers: this.headers(),
+            body: JSON.stringify({ code })
+        });
+        return res.json();
+    },
+
+    // PDF-Preview-URL bauen
+    previewPdfUrl() {
+        return `${this.baseUrl}/${this.applicationId}/preview-pdf?passphrase=${encodeURIComponent(this.passphrase)}`;
+    },
+
     // Gespeicherte Session wiederherstellen
     restoreSession() {
         const appId = localStorage.getItem('eeg_app_id');

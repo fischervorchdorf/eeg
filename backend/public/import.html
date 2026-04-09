@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import - EEG Admin</title>
+    <link rel="stylesheet" href="/admin/css/admin.css">
+    <script src="/admin/js/admin-common.js"></script>
+    <style>
+        .step-indicator {
+            display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid var(--border);
+        }
+        .step {
+            padding: 0.6rem 1.25rem; font-size: 0.85rem; font-weight: 600;
+            color: var(--text-muted); border-bottom: 2px solid transparent; margin-bottom: -2px;
+            display: flex; align-items: center; gap: 0.5rem;
+        }
+        .step.active { color: var(--primary); border-bottom-color: var(--primary); }
+        .step.done { color: var(--success); }
+        .step-num {
+            width: 22px; height: 22px; border-radius: 50%; background: var(--border);
+            display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 700;
+        }
+        .step.active .step-num { background: var(--primary); color: #fff; }
+        .step.done .step-num { background: var(--success); color: #fff; }
+
+        /* Upload-Bereich */
+        .upload-zone {
+            border: 2px dashed var(--border); border-radius: var(--radius);
+            padding: 3rem; text-align: center; cursor: pointer; transition: all 0.2s;
+            background: var(--bg-white);
+        }
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--primary); background: var(--primary-light);
+        }
+        .upload-zone input { display: none; }
+        .upload-icon { font-size: 3rem; margin-bottom: 1rem; }
+        .upload-zone h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+        .upload-zone p { color: var(--text-muted); font-size: 0.875rem; }
+        .upload-formats {
+            display: flex; gap: 0.75rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap;
+        }
+        .format-badge {
+            padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 700;
+            border: 1.5px solid;
+        }
+        .format-xlsx { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; }
+        .format-csv  { background: #fff3e0; color: #e65100; border-color: #ffcc80; }
+
+        /* Mapping-Tabelle */
+        .mapping-table { width: 100%; border-collapse: collapse; }
+        .mapping-table th {
+            background: #f8fafc; padding: 0.6rem 0.75rem; font-size: 0.75rem;
+            font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+            color: var(--text-muted); border-bottom: 1px solid var(--border); text-align: left;
+        }
+        .mapping-table td {
+            padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); vertical-align: middle;
+        }
+        .mapping-table tr:last-child td { border-bottom: none; }
+        .col-name { font-weight: 600; font-size: 0.875rem; }
+        .col-sample { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+        .mapping-table select { width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 6px; font-size: 0.85rem; }
+        .mapping-table select:focus { border-color: var(--primary); outline: none; }
+
+        /* Preview-Tabelle */
+        .preview-table-wrap { overflow-x: auto; }
+        .preview-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        .preview-table th { background: #f8fafc; padding: 0.5rem; font-weight: 600; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        .preview-table td { padding: 0.45rem 0.5rem; border-bottom: 1px solid var(--border); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* Ergebnis */
+        .result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+        .result-card { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; text-align: center; }
+        .result-num { font-size: 2.5rem; font-weight: 800; line-height: 1; }
+        .result-label { font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; margin-top: 0.25rem; }
+        .result-ok  { color: var(--success); }
+        .result-skip { color: var(--warning); }
+        .result-err  { color: var(--error); }
+
+        .error-list { background: #fff5f5; border: 1px solid #fecaca; border-radius: var(--radius-sm); padding: 0.75rem 1rem; max-height: 200px; overflow-y: auto; }
+        .error-list li { font-size: 0.82rem; color: var(--error); padding: 2px 0; }
+
+        .section-card { background: var(--bg-white); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1rem; }
+        .section-title { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 1rem; }
+
+        .options-row { display: flex; gap: 1.5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+        .options-row label { display: flex; align-items: center; gap: 0.4rem; font-size: 0.875rem; cursor: pointer; }
+
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body>
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>
+            <span>EEG-Portal</span>
+        </div>
+        <ul class="sidebar-nav">
+            <li><a href="/admin/dashboard.html">Dashboard</a></li>
+            <li><a href="/admin/applications.html">Anträge</a></li>
+            <li><a href="/admin/members.html">Mitglieder</a></li>
+            <li><a href="/admin/statistik.html">Statistik</a></li>
+            <li class="active"><a href="/admin/import.html">Import</a></li>
+            <li><a href="/admin/export.html">Export</a></li>
+            <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+        </ul>
+        <div class="sidebar-footer">
+            <span id="adminName"></span>
+            <button class="btn-logout" id="btnLogout">Abmelden</button>
+        </div>
+    </nav>
+
+    <main class="main-content">
+        <div class="page-header">
+            <h1>Mitglieder importieren</h1>
+            <button class="btn-sidebar-toggle" id="btnToggleSidebar">&#9776;</button>
+        </div>
+
+        <!-- Schritte -->
+        <div class="step-indicator">
+            <div class="step active" id="step1ind"><div class="step-num">1</div> Datei hochladen</div>
+            <div class="step" id="step2ind"><div class="step-num">2</div> Spalten zuordnen</div>
+            <div class="step" id="step3ind"><div class="step-num">3</div> Importieren</div>
+        </div>
+
+        <!-- Schritt 1: Upload -->
+        <div id="step1">
+            <div class="section-card">
+                <div class="section-title">Datei auswählen</div>
+
+                <div class="upload-zone" id="uploadZone">
+                    <input type="file" id="fileInput" accept=".xlsx,.csv,.xls">
+                    <div class="upload-icon">📂</div>
+                    <h3>Datei hierher ziehen oder klicken</h3>
+                    <p>Unterstützte Formate:</p>
+                    <div class="upload-formats">
+                        <span class="format-badge format-xlsx">Excel (.xlsx)</span>
+                        <span class="format-badge format-csv">CSV (.csv)</span>
+                    </div>
+                </div>
+
+                <div style="margin-top:1.25rem">
+                    <label style="font-size:0.82rem;font-weight:600;color:var(--text-muted)">Vorlage herunterladen:</label>
+                    <div style="display:flex;gap:0.75rem;margin-top:0.5rem">
+                        <a href="/api/admin/import/template/xlsx" class="btn btn-sm" style="text-decoration:none">⬇ Excel-Vorlage</a>
+                        <a href="/api/admin/import/template/csv" class="btn btn-sm" style="text-decoration:none">⬇ CSV-Vorlage</a>
+                    </div>
+                </div>
+            </div>
+
+            <div id="uploadStatus" style="display:none" class="section-card">
+                <div class="section-title">Datei wird verarbeitet…</div>
+                <p style="color:var(--text-muted)">⏳ Bitte warten…</p>
+            </div>
+        </div>
+
+        <!-- Schritt 2: Spalten-Mapping -->
+        <div id="step2" class="hidden">
+            <div class="section-card">
+                <div class="section-title">Gefundene Daten</div>
+                <p id="previewInfo" style="color:var(--text-muted);font-size:0.875rem;margin-bottom:1rem"></p>
+                <div class="preview-table-wrap">
+                    <table class="preview-table" id="previewTable"></table>
+                </div>
+            </div>
+
+            <div class="section-card">
+                <div class="section-title">Spalten zuordnen</div>
+                <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1rem">
+                    Ordne jede Spalte aus deiner Datei dem richtigen Feld zu. Nicht benötigte Spalten auf "ignorieren" setzen.
+                </p>
+                <table class="mapping-table" id="mappingTable">
+                    <thead>
+                        <tr>
+                            <th style="width:220px">Spalte in deiner Datei</th>
+                            <th style="width:40%">Beispielwert</th>
+                            <th>Zuordnung → Feld</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mappingBody"></tbody>
+                </table>
+            </div>
+
+            <div class="section-card">
+                <div class="section-title">Import-Optionen</div>
+                <div class="options-row">
+                    <div>
+                        <label style="font-size:0.82rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:0.4rem">Duplikate (gleiche E-Mail / IBAN)</label>
+                        <select id="duplicateMode" style="padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:6px;font-size:0.875rem">
+                            <option value="skip">Überspringen</option>
+                            <option value="update">Aktualisieren</option>
+                        </select>
+                    </div>
+                    <div id="eegSelectWrap" class="hidden">
+                        <label style="font-size:0.82rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:0.4rem">Ziel-EEG</label>
+                        <select id="eegSelect" style="padding:0.45rem 0.7rem;border:1px solid var(--border);border-radius:6px;font-size:0.875rem"></select>
+                    </div>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:0.75rem">
+                <button class="btn" id="btnBack1">← Zurück</button>
+                <button class="btn btn-primary" id="btnStartImport">Import starten →</button>
+            </div>
+        </div>
+
+        <!-- Schritt 3: Ergebnis -->
+        <div id="step3" class="hidden">
+            <div id="importProgress" class="section-card" style="text-align:center;padding:2rem">
+                <div style="font-size:2rem;margin-bottom:1rem">⏳</div>
+                <p style="font-size:1rem;font-weight:600">Import läuft…</p>
+                <p style="color:var(--text-muted);font-size:0.875rem">Bitte nicht schließen</p>
+            </div>
+
+            <div id="importResult" class="hidden">
+                <div class="result-grid">
+                    <div class="result-card">
+                        <div class="result-num result-ok" id="resImported">0</div>
+                        <div class="result-label">✅ Importiert</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-num result-skip" id="resSkipped">0</div>
+                        <div class="result-label">⏭ Übersprungen</div>
+                    </div>
+                    <div class="result-card">
+                        <div class="result-num result-err" id="resErrors">0</div>
+                        <div class="result-label">❌ Fehler</div>
+                    </div>
+                </div>
+
+                <div id="errorListWrap" class="hidden section-card">
+                    <div class="section-title">Fehlerdetails</div>
+                    <ul class="error-list" id="errorList"></ul>
+                </div>
+
+                <div style="display:flex;gap:0.75rem">
+                    <a href="/admin/members.html" class="btn btn-primary" style="text-decoration:none">→ Mitglieder ansehen</a>
+                    <button class="btn" id="btnNewImport">Weiteren Import starten</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+    let previewData = null;
+    let fieldDefs = [];
+
+    function setStep(n) {
+        [1,2,3].forEach(i => {
+            document.getElementById(`step${i}`).classList.toggle('hidden', i !== n);
+            const ind = document.getElementById(`step${i}ind`);
+            ind.classList.toggle('active', i === n);
+            ind.classList.toggle('done', i < n);
+        });
+    }
+
+    // --- Upload ---
+    const zone = document.getElementById('uploadZone');
+    const fileInput = document.getElementById('fileInput');
+
+    zone.addEventListener('click', () => fileInput.click());
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+        e.preventDefault();
+        zone.classList.remove('dragover');
+        if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+    });
+    fileInput.addEventListener('change', () => {
+        if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    async function handleFile(file) {
+        document.getElementById('uploadStatus').style.display = 'block';
+        const fd = new FormData();
+        fd.append('file', file);
+
+        const res = await fetch('/api/admin/import/preview', { method: 'POST', body: fd });
+        const data = await res.json();
+        document.getElementById('uploadStatus').style.display = 'none';
+
+        if (data.error) { alert('Fehler: ' + data.error); return; }
+
+        previewData = data;
+        fieldDefs = data.field_defs;
+        showStep2(data);
+    }
+
+    function showStep2(data) {
+        setStep(2);
+        document.getElementById('previewInfo').textContent =
+            `${data.total} Zeilen gefunden · Vorschau der ersten 5:`;
+
+        // Vorschau-Tabelle
+        const t = document.getElementById('previewTable');
+        const heads = data.headers.map(h => `<th>${h}</th>`).join('');
+        const body = data.preview.map(row =>
+            '<tr>' + data.headers.map(h => `<td title="${row[h]||''}">${row[h]||''}</td>`).join('') + '</tr>'
+        ).join('');
+        t.innerHTML = `<thead><tr>${heads}</tr></thead><tbody>${body}</tbody>`;
+
+        // Mapping-Tabelle
+        const fieldOptions = fieldDefs.map(f =>
+            `<option value="${f.key}">${f.label}</option>`
+        ).join('');
+
+        document.getElementById('mappingBody').innerHTML = data.headers.map(h => {
+            const sample = data.preview.slice(0,3).map(r => r[h]).filter(Boolean).join(' · ') || '—';
+            const mapped = data.mapping[h] || 'skip';
+            return `<tr>
+                <td><div class="col-name">${h}</div></td>
+                <td><div class="col-sample" title="${sample}">${sample}</div></td>
+                <td><select data-col="${h}">${fieldOptions}</select></td>
+            </tr>`;
+        }).join('');
+
+        // Gewählte Mappings setzen
+        document.querySelectorAll('#mappingBody select').forEach(sel => {
+            const col = sel.dataset.col;
+            sel.value = data.mapping[col] || 'skip';
+        });
+
+        // EEG-Select für Super-Admins
+        loadEegs();
+    }
+
+    async function loadEegs() {
+        const res = await fetch('/api/auth/me');
+        const user = await res.json();
+        if (user.rolle === 'super_admin') {
+            const eRes = await fetch('/api/super-admin/eegs');
+            const eegs = await eRes.json();
+            const sel = document.getElementById('eegSelect');
+            sel.innerHTML = eegs.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
+            document.getElementById('eegSelectWrap').classList.remove('hidden');
+        }
+    }
+
+    // Import starten
+    document.getElementById('btnStartImport').addEventListener('click', async () => {
+        const mapping = {};
+        document.querySelectorAll('#mappingBody select').forEach(sel => {
+            mapping[sel.dataset.col] = sel.value;
+        });
+
+        const hasMeaningfulMapping = Object.values(mapping).some(v => v !== 'skip');
+        if (!hasMeaningfulMapping) {
+            alert('Bitte ordne mindestens ein Feld zu.');
+            return;
+        }
+
+        setStep(3);
+        document.getElementById('importProgress').classList.remove('hidden');
+        document.getElementById('importResult').classList.add('hidden');
+
+        const body = {
+            data: previewData.data,
+            mapping,
+            duplicate_mode: document.getElementById('duplicateMode').value,
+        };
+        const eegSel = document.getElementById('eegSelect');
+        if (eegSel.value) body.eeg_id = eegSel.value;
+
+        const res = await fetch('/api/admin/import/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body)
+        });
+        const result = await res.json();
+
+        document.getElementById('importProgress').classList.add('hidden');
+        document.getElementById('importResult').classList.remove('hidden');
+        document.getElementById('resImported').textContent = result.imported || 0;
+        document.getElementById('resSkipped').textContent  = result.skipped  || 0;
+        document.getElementById('resErrors').textContent   = (result.errors || []).length;
+
+        if (result.errors && result.errors.length > 0) {
+            document.getElementById('errorListWrap').classList.remove('hidden');
+            document.getElementById('errorList').innerHTML =
+                result.errors.map(e => `<li>${e}</li>`).join('');
+        }
+    });
+
+    document.getElementById('btnBack1').addEventListener('click', () => setStep(1));
+    document.getElementById('btnNewImport').addEventListener('click', () => {
+        previewData = null;
+        document.getElementById('fileInput').value = '';
+        setStep(1);
+    });
+
+    // Auth
+    document.getElementById('btnLogout').addEventListener('click', async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/admin/';
+    });
+    document.getElementById('btnToggleSidebar')?.addEventListener('click', () => {
+        document.getElementById('sidebar').classList.toggle('open');
+    });
+    (async () => {
+        const res = await fetch('/api/auth/me');
+        const user = await res.json();
+        if (!user.id) { window.location.href = '/admin/'; return; }
+        document.getElementById('adminName').textContent = user.username;
+        injectSuperAdminNav(user);
+    })();
+    </script>
+</body>
+</html>

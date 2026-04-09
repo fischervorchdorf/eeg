@@ -31,6 +31,12 @@
         .perm-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin: 0.75rem 0; }
         .perm-grid label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; cursor: pointer; }
         .slug-preview { font-size: 0.8rem; color: var(--primary); margin-top: 0.25rem; }
+        .eeg-checkbox-list { max-height: 200px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.5rem; background: var(--bg-white); }
+        .eeg-checkbox-list label { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.25rem; font-size: 0.9rem; cursor: pointer; border-radius: 4px; }
+        .eeg-checkbox-list label:hover { background: rgba(26,115,232,0.07); }
+        .eeg-checkbox-list input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--primary); }
+        .eeg-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+        .eeg-tag { background: rgba(26,115,232,0.12); color: var(--primary); padding: 0.15rem 0.5rem; border-radius: 12px; font-size: 0.78rem; font-weight: 500; }
     </style>
 </head>
 <body>
@@ -45,6 +51,8 @@
             <li><a href="/admin/members.html">Mitglieder</a></li>
             <li><a href="/admin/export.html">Export</a></li>
             <li><a href="/admin/eeg-settings.html">Einstellungen</a></li>
+            <li><a href="/admin/statistik.html">Statistik</a></li>
+            <li><a href="/admin/import.html">Import</a></li>
             <li class="active"><a href="/admin/super-admin.html">Super-Admin</a></li>
         </ul>
         <div class="sidebar-footer">
@@ -198,9 +206,11 @@
                         </div>
                     </div>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label>Zugewiesene EEG</label>
-                            <select id="userEeg"><option value="">-- Keine (Super-Admin) --</option></select>
+                        <div class="form-group" style="flex:1 1 100%">
+                            <label>Zugewiesene EEG(s) <span style="font-weight:400;color:var(--text-muted)">(mehrere möglich)</span></label>
+                            <div class="eeg-checkbox-list" id="eegCheckboxList">
+                                <em style="color:var(--text-muted);font-size:0.85rem">Wird geladen...</em>
+                            </div>
                         </div>
                     </div>
                     <div>
@@ -356,26 +366,45 @@
         });
 
         // --- USERS ---
+        function renderEegCheckboxes(selectedIds = []) {
+            const container = document.getElementById('eegCheckboxList');
+            if (!allEegs.length) {
+                container.innerHTML = '<em style="color:var(--text-muted);font-size:0.85rem">Keine EEGs vorhanden</em>';
+                return;
+            }
+            container.innerHTML = allEegs.map(e => `
+                <label>
+                    <input type="checkbox" name="eegCheck" value="${e.id}"
+                        ${selectedIds.includes(e.id) ? 'checked' : ''}>
+                    ${e.name}
+                    <span style="color:var(--text-muted);font-size:0.78rem;margin-left:auto">${e.slug}</span>
+                </label>
+            `).join('');
+        }
+
+        function getCheckedEegIds() {
+            return [...document.querySelectorAll('input[name="eegCheck"]:checked')]
+                .map(cb => parseInt(cb.value));
+        }
+
         async function loadUsers() {
             const res = await fetch('/api/super-admin/users');
             allUsers = await res.json();
             document.getElementById('userCount').textContent = `${allUsers.length} Admin-Benutzer`;
 
-            // EEG-Dropdown aktualisieren
-            const eegSelect = document.getElementById('userEeg');
-            eegSelect.innerHTML = '<option value="">-- Keine (Super-Admin) --</option>' +
-                allEegs.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
-
             document.getElementById('usersBody').innerHTML = allUsers.map(u => {
                 const perms = u.berechtigungen || {};
                 const permList = Object.keys(perms).filter(k => perms[k]).join(', ') || '-';
-                const eeg = allEegs.find(e => e.id === u.eeg_id);
+                const userEegs = u.eegs || [];
+                const eegDisplay = userEegs.length
+                    ? `<div class="eeg-tags">${userEegs.map(e => `<span class="eeg-tag">${e.name}</span>`).join('')}</div>`
+                    : '<span class="text-muted">-</span>';
                 return `
                     <tr>
                         <td><strong>${u.username}</strong></td>
                         <td>${u.email}</td>
                         <td><span class="badge badge-${u.rolle === 'super_admin' ? 'primary' : 'info'}">${u.rolle}</span></td>
-                        <td>${eeg ? eeg.name : '-'}</td>
+                        <td>${eegDisplay}</td>
                         <td style="font-size:0.82rem">${permList}</td>
                         <td>${u.letzter_login ? new Date(u.letzter_login).toLocaleString('de-AT') : 'Nie'}</td>
                         <td>${u.aktiv ? '<span class="badge badge-success">Aktiv</span>' : '<span class="badge badge-muted">Inaktiv</span>'}</td>
@@ -394,7 +423,7 @@
             document.getElementById('userEmail').value = '';
             document.getElementById('userPassword').value = '';
             document.getElementById('userRolle').value = 'eeg_admin';
-            document.getElementById('userEeg').value = '';
+            renderEegCheckboxes([]);
             document.getElementById('permAntraege').checked = true;
             document.getElementById('permMitglieder').checked = true;
             document.getElementById('permExport').checked = true;
@@ -411,7 +440,8 @@
             document.getElementById('userEmail').value = u.email;
             document.getElementById('userPassword').value = '';
             document.getElementById('userRolle').value = u.rolle;
-            document.getElementById('userEeg').value = u.eeg_id || '';
+            const selectedIds = (u.eegs || []).map(e => e.id);
+            renderEegCheckboxes(selectedIds);
             const perms = u.berechtigungen || {};
             document.getElementById('permAntraege').checked = !!perms.antraege;
             document.getElementById('permMitglieder').checked = !!perms.mitglieder;
@@ -428,7 +458,7 @@
                 email: document.getElementById('userEmail').value,
                 password: document.getElementById('userPassword').value,
                 rolle: document.getElementById('userRolle').value,
-                eeg_id: document.getElementById('userEeg').value || null,
+                eeg_ids: getCheckedEegIds(),
                 berechtigungen: {
                     antraege: document.getElementById('permAntraege').checked,
                     mitglieder: document.getElementById('permMitglieder').checked,

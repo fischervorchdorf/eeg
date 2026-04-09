@@ -11,7 +11,7 @@ function validateEmail(email) {
     return { valid: true };
 }
 
-// Oesterreichische IBAN (AT + 18 Ziffern = 20 Zeichen)
+// Oesterreichische IBAN (AT + 18 Ziffern = 20 Zeichen) mit MOD-97
 function validateIBAN(iban) {
     if (!iban) return { valid: false, error: 'IBAN ist erforderlich' };
     const clean = iban.replace(/\s/g, '').toUpperCase();
@@ -37,28 +37,77 @@ function validateIBAN(iban) {
     return { valid: true, formatted: clean.replace(/(.{4})/g, '$1 ').trim() };
 }
 
-// Oesterreichische Zaehlpunktnummer (AT + 33 Zeichen, Format: AT003000 00000000000 00000000000000 00)
+// Oesterreichische Zaehlpunktnummer mit EAN-13 Pruefziffer
+// Format: AT + 31-33 Ziffern. Letzte Ziffer ist EAN-13 Pruefziffer
+// AT003000NNNNNNNNNNNAAAAAAAAAAAAAACC (33 Ziffern)
 function validateZaehlpunkt(zp) {
     if (!zp) return { valid: false, error: 'Zaehlpunktnummer ist erforderlich' };
     const clean = zp.replace(/\s/g, '').toUpperCase();
 
     if (!/^AT\d{31,33}$/.test(clean)) {
-        return { valid: false, error: 'Zaehlpunktnummer muss mit AT beginnen und 33 Ziffern haben' };
+        return { valid: false, error: 'Format: AT + 31-33 Ziffern (steht auf der Stromrechnung)' };
     }
 
-    // Formatierte Anzeige
-    const formatted = `${clean.slice(0,2)} ${clean.slice(2,8)} ${clean.slice(8,19)} ${clean.slice(19,33)}`;
+    // EAN-13 Pruefziffer (nur bei 33 Ziffern - das ist Standard)
+    if (clean.length === 35) { // AT + 33 Ziffern
+        const digits = clean.slice(2);
+        const checkDigit = parseInt(digits[digits.length - 1]);
+        const body = digits.slice(0, -1);
 
-    return { valid: true, formatted, clean };
+        // Standard EAN-13 (letzte 13 Ziffern fuer Pruefung)
+        const last13 = body.slice(-12);
+        let sum = 0;
+        for (let i = 0; i < 12; i++) {
+            sum += parseInt(last13[i]) * (i % 2 === 0 ? 1 : 3);
+        }
+        const expected = (10 - (sum % 10)) % 10;
+
+        if (expected !== checkDigit) {
+            // Manche aelteren ZP haben keine korrekte Pruefziffer - Warnung statt Fehler
+            return { valid: true, formatted: formatZp(clean), clean, warning: 'Pruefziffer weicht ab - bitte ueberpruefen' };
+        }
+    }
+
+    return { valid: true, formatted: formatZp(clean), clean };
 }
 
-// UID-Nummer (ATU + 8 Ziffern)
+function formatZp(clean) {
+    if (clean.length >= 35) {
+        return `${clean.slice(0,2)} ${clean.slice(2,8)} ${clean.slice(8,19)} ${clean.slice(19,33)} ${clean.slice(33)}`;
+    }
+    return `${clean.slice(0,2)} ${clean.slice(2,8)} ${clean.slice(8)}`;
+}
+
+// Netzbetreiber-Code aus Zaehlpunktnummer extrahieren (Stellen 3-8)
+function extractNetzbetreiberCode(zp) {
+    if (!zp) return null;
+    const clean = zp.replace(/\s/g, '').toUpperCase();
+    if (!/^AT\d+/.test(clean)) return null;
+    return clean.slice(2, 8); // 6-stelliger Netzbetreiber-Code
+}
+
+// UID-Nummer (ATU + 8 Ziffern) mit Pruefziffer-Algorithmus
 function validateUID(uid) {
     if (!uid) return { valid: false, error: 'UID-Nummer ist erforderlich' };
     const clean = uid.replace(/\s/g, '').toUpperCase();
 
     if (!/^ATU\d{8}$/.test(clean)) {
-        return { valid: false, error: 'UID-Nummer muss Format ATU + 8 Ziffern haben' };
+        return { valid: false, error: 'UID-Nummer muss Format ATU + 8 Ziffern haben (z.B. ATU12345678)' };
+    }
+
+    // Oesterreichischer UID-Pruefziffer-Algorithmus
+    // Stellen 1-7 (nach ATU) werden gewichtet, Stelle 8 ist Pruefziffer
+    const digits = clean.slice(3).split('').map(Number);
+    let sum = 0;
+    for (let i = 0; i < 7; i++) {
+        const weight = i % 2 === 0 ? 1 : 2;
+        const product = digits[i] * weight;
+        sum += Math.floor(product / 10) + (product % 10);
+    }
+    const checkDigit = (10 - ((sum + 4) % 10)) % 10;
+
+    if (checkDigit !== digits[7]) {
+        return { valid: false, error: 'UID-Pruefziffer ungueltig - bitte UID-Nummer ueberpruefen' };
     }
 
     return { valid: true, formatted: clean };
@@ -67,7 +116,7 @@ function validateUID(uid) {
 // PLZ (4 Ziffern, oesterreichisch)
 function validatePLZ(plz) {
     if (!plz) return { valid: false, error: 'PLZ ist erforderlich' };
-    const clean = plz.trim();
+    const clean = plz.toString().trim();
 
     if (!/^\d{4}$/.test(clean)) {
         return { valid: false, error: 'PLZ muss 4 Ziffern haben' };
@@ -108,6 +157,40 @@ function validateGeburtsdatum(datum) {
     return { valid: true };
 }
 
+// Ausweisnummer je nach Typ
+// Reisepass AT: 1 Buchstabe + 7 Ziffern (z.B. P1234567)
+// Personalausweis AT: 8 alphanumerische Zeichen
+// Fuehrerschein AT: 8-stellige Zahl
+function validateAusweisnummer(nummer, typ) {
+    if (!nummer || !typ) return { valid: true }; // beides optional
+    const clean = nummer.trim().toUpperCase();
+    if (!clean) return { valid: true };
+
+    switch (typ) {
+        case 'Reisepass':
+            if (!/^[A-Z]\d{7}$/.test(clean)) {
+                return { valid: false, error: 'Reisepass-Nummer: 1 Buchstabe + 7 Ziffern (z.B. P1234567)' };
+            }
+            break;
+        case 'Personalausweis':
+            if (!/^[A-Z0-9]{8,9}$/.test(clean)) {
+                return { valid: false, error: 'Personalausweis-Nummer: 8-9 alphanumerische Zeichen' };
+            }
+            break;
+        case 'Führerschein':
+        case 'Fuehrerschein':
+            if (!/^\d{7,8}$/.test(clean)) {
+                return { valid: false, error: 'Führerschein-Nummer: 7-8 stellige Zahl' };
+            }
+            break;
+        default:
+            if (clean.length < 4) {
+                return { valid: false, error: 'Ausweisnummer zu kurz (mind. 4 Zeichen)' };
+            }
+    }
+    return { valid: true };
+}
+
 // Inventarnummer (Format: XXX.XXX.XXX, permissiv)
 function validateInventarnummer(inv) {
     if (!inv) return { valid: true }; // Optional
@@ -122,11 +205,19 @@ function validateFirmenbuchnummer(fb) {
     if (!fb) return { valid: false, error: 'Firmenbuchnummer ist erforderlich' };
     const clean = fb.trim().toUpperCase();
 
-    if (!/^(FN\s?)?\d{5,6}\s?[A-Z]$/i.test(clean)) {
+    if (!/^(FN\s?)?\d{1,6}\s?[A-Z]$/i.test(clean)) {
         return { valid: false, error: 'Ungueltige Firmenbuchnummer (z.B. FN 123456a)' };
     }
 
     return { valid: true };
+}
+
+// IBAN -> Bankidentifier extrahieren (5 Stellen Bankleitzahl)
+function extractAtBlz(iban) {
+    if (!iban) return null;
+    const clean = iban.replace(/\s/g, '').toUpperCase();
+    if (!/^AT\d{18}$/.test(clean)) return null;
+    return clean.slice(4, 9); // 5-stellige BLZ
 }
 
 // Schritt-Validierung (validiert alle Felder eines Onboarding-Schritts)
@@ -162,6 +253,11 @@ function validateStep(step, data, memberType) {
                 if (!data.firmenname?.trim()) errors.firmenname = 'Firmenname ist erforderlich';
                 const uidResult = validateUID(data.uid_nummer);
                 if (!uidResult.valid) errors.uid_nummer = uidResult.error;
+            }
+
+            if (data.ausweisnummer?.trim() || data.ausweis_typ) {
+                const ausweisResult = validateAusweisnummer(data.ausweisnummer, data.ausweis_typ);
+                if (!ausweisResult.valid) errors.ausweisnummer = ausweisResult.error;
             }
 
             break;
@@ -204,5 +300,9 @@ module.exports = {
     validateGeburtsdatum,
     validateInventarnummer,
     validateFirmenbuchnummer,
-    validateStep
+    validateAusweisnummer,
+    validateStep,
+    extractNetzbetreiberCode,
+    extractAtBlz,
+    formatZp
 };

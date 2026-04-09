@@ -12,9 +12,9 @@ async function up(pool) {
                 eintrittsbeitrag_ct, zusatz_zaehlpunkt_ct, preis_erzeugung_ct, preis_verbrauch_ct, mwst_satz,
                 aktiv)
             VALUES (1,
-                'Buergerenergiegemeinschaft Netzwerk Zukunft',
+                'Bürgerenergiegemeinschaft Netzwerk Zukunft',
                 'netzwerk-zukunft',
-                '4655 Vorchdorf, Neue Landstrasse 27',
+                '4655 Vorchdorf, Neue Landstraße 27',
                 '1446617102',
                 'beg-netzwerk-zukunft@kem-traunsteinregion.at',
                 'AT32ZZZ00000080064',

@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="/css/onboarding.css">
 </head>
 <body>
+    <!-- Solar Panel Background Canvas -->
+    <canvas id="solarCanvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;"></canvas>
     <div class="bg-overlay"></div>
 
     <div class="container">
@@ -70,6 +72,18 @@
                 <h2 id="step3Title">Allgemeine Daten</h2>
                 <p class="step-subtitle">Für die Anmeldung benötigen wir ein paar Daten.</p>
 
+                <!-- OCR-Upload: Stromrechnung scannen für Auto-Fill -->
+                <div class="ocr-upload-box">
+                    <div class="ocr-icon">📄</div>
+                    <div class="ocr-text">
+                        <strong>Tipp: Stromrechnung hochladen</strong>
+                        <p>Wir erkennen automatisch deine Zählpunktnummer, Kundennummer und Adresse aus deiner letzten Stromrechnung.</p>
+                    </div>
+                    <button type="button" id="btnOcrUpload" class="btn btn-secondary">📷 Stromrechnung scannen</button>
+                    <input type="file" id="ocrFile" accept="image/*,application/pdf" style="display:none">
+                    <div id="ocrResult" class="ocr-result"></div>
+                </div>
+
                 <!-- Firmen-Felder (nur für Unternehmen) -->
                 <div id="companyFields" class="form-section" style="display:none">
                     <div class="form-row">
@@ -78,12 +92,14 @@
                             <input type="text" id="firmenname" required>
                         </div>
                         <div class="form-group">
-                            <label for="uid_nummer">UID-Nummer *</label>
+                            <label for="uid_nummer">UID-Nummer * <button type="button" class="help-btn" data-help="uid" title="Hilfe">?</button></label>
                             <input type="text" id="uid_nummer" placeholder="ATU12345678">
+                            <small class="validation-hint"></small>
                         </div>
                         <div class="form-group">
-                            <label for="firmenbuchnummer">Firmenbuchnummer</label>
+                            <label for="firmenbuchnummer">Firmenbuchnummer <button type="button" class="help-btn" data-help="firmenbuchnummer" title="Hilfe">?</button></label>
                             <input type="text" id="firmenbuchnummer" placeholder="FN 123456a">
+                            <small class="validation-hint"></small>
                         </div>
                     </div>
                 </div>
@@ -192,7 +208,26 @@
                         <div class="form-group flex-2">
                             <label for="email">E-Mail-Adresse *</label>
                             <input type="email" id="email" required>
+                            <input type="hidden" id="emailVerifiedFlag" value="0">
+                            <small class="validation-hint"></small>
                         </div>
+                    </div>
+
+                    <!-- E-Mail-Verifikation mit 6-stelligem Code -->
+                    <div class="email-verify-box">
+                        <button type="button" id="btnSendVerification" class="btn btn-secondary btn-sm">📧 Bestätigungscode an E-Mail senden</button>
+                        <div id="verifyCodeBox" style="display:none; margin-top:0.8rem;">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="verifyCode">6-stelliger Code</label>
+                                    <input type="text" id="verifyCode" maxlength="6" pattern="\d{6}" placeholder="000000" inputmode="numeric">
+                                </div>
+                                <div class="form-group" style="align-self: flex-end;">
+                                    <button type="button" id="btnCheckVerification" class="btn btn-primary btn-sm">Code prüfen</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="verifyMsg" class="verify-msg"></div>
                     </div>
                 </div>
             </section>
@@ -208,7 +243,7 @@
                         <div class="zp-entry" data-idx="0">
                             <div class="form-row">
                                 <div class="form-group flex-3">
-                                    <label>Zählpunktnummer *</label>
+                                    <label>Zählpunktnummer * <button type="button" class="help-btn" data-help="zaehlpunkt" title="Wo finde ich das?">?</button></label>
                                     <input type="text" class="zp-nummer" placeholder="AT 003000 00000000000 00000000000000 00" required>
                                     <small class="validation-hint"></small>
                                 </div>
@@ -298,7 +333,7 @@
                     </div>
                     <div class="form-row">
                         <div class="form-group flex-2">
-                            <label for="iban">IBAN *</label>
+                            <label for="iban">IBAN * <button type="button" class="help-btn" data-help="iban" title="Wo finde ich meine IBAN?">?</button></label>
                             <input type="text" id="iban" placeholder="AT00 0000 0000 0000 0000" required>
                             <small class="validation-hint"></small>
                         </div>
@@ -370,11 +405,11 @@
                     </div>
                     <div class="form-row" style="margin-top:1rem">
                         <div class="form-group">
-                            <label for="kundennummer_netzbetreiber">Kundennummer beim zuständigen Netzbetreiber</label>
+                            <label for="kundennummer_netzbetreiber">Kundennummer beim zuständigen Netzbetreiber <button type="button" class="help-btn" data-help="kundennummer_netzbetreiber" title="Hilfe">?</button></label>
                             <input type="text" id="kundennummer_netzbetreiber">
                         </div>
                         <div class="form-group">
-                            <label for="inventarnummer_zaehler">Inventarnummer eines beliebigen Zählers</label>
+                            <label for="inventarnummer_zaehler">Inventarnummer eines beliebigen Zählers <button type="button" class="help-btn" data-help="inventarnummer" title="Hilfe">?</button></label>
                             <input type="text" id="inventarnummer_zaehler" placeholder="XXX.XXX.XXX">
                         </div>
                     </div>
@@ -404,6 +439,13 @@
                             <label for="eauto_jahreskilometer">Jahreskilometer der Kfz</label>
                             <input type="number" id="eauto_jahreskilometer" placeholder="(Bitte Gesamtsumme aller Kfz angeben)">
                         </div>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="pdf-preview-box">
+                        <p><strong>📄 Antrag prüfen:</strong> Vor dem endgültigen Absenden kannst du eine Vorschau deines Antrags als PDF herunterladen.</p>
+                        <button type="button" id="btnPreviewPdf" class="btn btn-secondary">PDF-Vorschau öffnen</button>
                     </div>
                 </div>
 
@@ -454,7 +496,10 @@
                     <polyline points="15 18 9 12 15 6"/>
                 </svg>
             </button>
-            <button type="button" class="btn btn-primary" id="btnNext">Weiter zum nächsten Schritt</button>
+            <div class="wizard-nav-center">
+                <span class="step-counter" id="stepCounter"></span>
+                <button type="button" class="btn btn-primary" id="btnNext">Weiter</button>
+            </div>
             <div class="progress-bar">
                 <div class="progress-fill" id="progressFill"></div>
                 <span class="progress-text" id="progressText">0%</span>
@@ -499,7 +544,9 @@
 
     <script src="/js/validators.js"></script>
     <script src="/js/onboarding-api.js"></script>
+    <script src="/js/autofill.js"></script>
     <script src="/js/file-upload.js"></script>
     <script src="/js/onboarding-app.js"></script>
+    <script src="/js/solar-bg.js"></script>
 </body>
 </html>

@@ -15,17 +15,17 @@ async function up(pool) {
 
         await conn.query(`
             INSERT IGNORE INTO eeg_netzbetreiber (name, region, portal_url, code_prefix) VALUES
-            ('Netz Oberoesterreich GmbH', 'Oberoesterreich', 'https://www.netzooe.at', 'AT003'),
-            ('Netz Niederoesterreich GmbH', 'Niederoesterreich', 'https://www.netz-noe.at', 'AT001'),
+            ('Netz Oberösterreich GmbH', 'Oberösterreich', 'https://www.netzooe.at', 'AT003'),
+            ('Netz Niederösterreich GmbH', 'Niederösterreich', 'https://www.netz-noe.at', 'AT001'),
             ('Wiener Netze GmbH', 'Wien', 'https://www.wienernetze.at', 'AT002'),
             ('Energienetze Steiermark GmbH', 'Steiermark', 'https://www.e-netze.at', 'AT005'),
-            ('Kaerntner Netz GmbH', 'Kaernten', 'https://www.kaerntennetz.at', 'AT006'),
+            ('Kärntner Netz GmbH', 'Kärnten', 'https://www.kaerntennetz.at', 'AT006'),
             ('Salzburg Netz GmbH', 'Salzburg', 'https://www.salzburgnetz.at', 'AT004'),
             ('Vorarlberger Energienetze GmbH', 'Vorarlberg', 'https://www.vorarlbergnetz.at', 'AT008'),
             ('TINETZ-Tiroler Netze GmbH', 'Tirol', 'https://www.tinetz.at', 'AT007'),
             ('Linz Netz GmbH', 'Linz', 'https://www.linznetz.at', 'AT009'),
             ('Energie Graz GmbH & Co KG', 'Graz', 'https://www.energiegraz.at', 'AT010'),
-            ('Energienetz Mitte GmbH', 'Oberoesterreich', 'https://www.energienetz-mitte.at', NULL),
+            ('Energienetz Mitte GmbH', 'Oberösterreich', 'https://www.energienetz-mitte.at', NULL),
             ('Stadtwerke Klagenfurt AG', 'Klagenfurt', NULL, NULL)
         `);
 
