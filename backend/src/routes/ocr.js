@@ -34,42 +34,59 @@ Felder:
 Wenn ein Feld nicht im Dokument zu finden ist, setze es auf null.
 Antworte NUR mit dem JSON-Objekt, sonst nichts.`;
 
-// Gemini Flash via Google AI API
-async function ocrWithGemini(base64, mediaType, apiKey) {
-    const isPdf = mediaType === 'application/pdf';
+// Gemini Flash via Google AI API — versucht mehrere Modelle der Reihe nach
+const GEMINI_MODELS = [
+    'gemini-2.5-flash-preview-04-17',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro',
+];
 
-    const part = isPdf
-        ? { inlineData: { mimeType: 'application/pdf', data: base64 } }
-        : { inlineData: { mimeType: mediaType, data: base64 } };
+async function ocrWithGemini(base64, mediaType, apiKey) {
+    const part = { inlineData: { mimeType: mediaType, data: base64 } };
 
     const body = {
         contents: [{
-            parts: [
-                part,
-                { text: EXTRACTION_PROMPT }
-            ]
+            parts: [ part, { text: EXTRACTION_PROMPT } ]
         }],
-        generationConfig: {
-            maxOutputTokens: 1024
-        }
+        generationConfig: { maxOutputTokens: 1024 }
     };
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-    const resp = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
-    });
+    let lastError;
+    for (const model of GEMINI_MODELS) {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        try {
+            const resp = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
 
-    if (!resp.ok) {
-        const errText = await resp.text();
-        console.error('[OCR] Gemini API Fehler:', resp.status, errText);
-        throw new Error(`Gemini API ${resp.status}`);
+            if (resp.status === 404) {
+                console.warn(`[OCR] Gemini Modell ${model} nicht gefunden, probiere nächstes...`);
+                lastError = new Error(`Gemini API 404 (${model})`);
+                continue;
+            }
+
+            if (!resp.ok) {
+                const errText = await resp.text();
+                console.error(`[OCR] Gemini ${model} Fehler:`, resp.status, errText);
+                lastError = new Error(`Gemini API ${resp.status}`);
+                continue;
+            }
+
+            const data = await resp.json();
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+            console.log(`[OCR] Gemini Modell ${model} erfolgreich`);
+            return text;
+        } catch (e) {
+            lastError = e;
+            console.warn(`[OCR] Gemini ${model} Exception:`, e.message);
+        }
     }
-
-    const data = await resp.json();
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    return text;
+    throw lastError || new Error('Alle Gemini-Modelle fehlgeschlagen');
 }
 
 // Anthropic Claude als Fallback
