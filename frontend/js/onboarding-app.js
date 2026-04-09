@@ -147,7 +147,7 @@
                 if (!/^\d{6}$/.test(code)) { alert('Bitte 6-stelligen Code eingeben'); return; }
 
                 checkBtn.disabled = true;
-                const result = await OnboardingAPI.checkVerificationCode(code);
+                const result = await OnboardingAPI.checkVerificationCode(code, val('email'));
                 checkBtn.disabled = false;
 
                 const msg = document.getElementById('verifyMsg');

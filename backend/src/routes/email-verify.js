@@ -157,4 +157,90 @@ router.post('/:id/check', requirePassphrase, async (req, res) => {
     }
 });
 
+// POST /api/email-verify/send - Code senden OHNE Application-ID (für Schritt 3 vor Antragserstellung)
+// Rate-Limiting via IP
+router.post('/send', async (req, res) => {
+    try {
+        const { email, eeg_id } = req.body;
+        if (!email) return res.status(400).json({ error: 'E-Mail fehlt' });
+
+        const emailValidation = validateEmail(email);
+        if (!emailValidation.valid) return res.status(400).json({ error: emailValidation.error });
+
+        const code = crypto.randomInt(100000, 999999).toString();
+
+        // EEG-Name laden
+        let eegName = 'Energiegemeinschaft';
+        if (eeg_id) {
+            const [tenants] = await pool.query('SELECT name FROM eeg_tenants WHERE id = ?', [eeg_id]);
+            if (tenants[0]) eegName = tenants[0].name;
+        }
+
+        // Code in Session speichern (einfach in DB ohne application_id = 0)
+        const codeHash = await bcrypt.hash(code, 8);
+        const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+        await pool.query(
+            `INSERT INTO eeg_email_verifications (application_id, email, code_hash, expires_at)
+             VALUES (0, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE code_hash = VALUES(code_hash), expires_at = VALUES(expires_at), verified = 0, attempts = 0`,
+            [email, codeHash, expiresAt]
+        );
+
+        const { text, html } = renderVerificationEmail({ code, eegName, applicationId: 0 });
+        const result = await sendMail({
+            to: email,
+            subject: `${eegName} – Dein Bestätigungscode`,
+            text, html
+        });
+
+        if (!result.success) {
+            return res.status(502).json({ error: 'E-Mail konnte nicht gesendet werden' });
+        }
+
+        res.json({
+            success: true,
+            message: 'Bestätigungscode wurde gesendet',
+            dev_code: result.dev ? code : undefined
+        });
+    } catch (err) {
+        console.error('[EMAIL-VERIFY] Send (no-app):', err.message);
+        res.status(500).json({ error: 'Serverfehler' });
+    }
+});
+
+// POST /api/email-verify/check - Code prüfen OHNE Application-ID
+router.post('/check', async (req, res) => {
+    try {
+        const { email, code } = req.body;
+        if (!email || !code) return res.status(400).json({ error: 'E-Mail und Code erforderlich' });
+        if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Ungültiger Code' });
+
+        const [verifs] = await pool.query(
+            `SELECT id, code_hash, attempts, expires_at FROM eeg_email_verifications
+             WHERE application_id = 0 AND email = ? AND verified = 0
+             ORDER BY id DESC LIMIT 1`,
+            [email]
+        );
+
+        if (!verifs.length) return res.status(400).json({ error: 'Kein aktiver Code – bitte neu anfordern' });
+
+        const verif = verifs[0];
+        if (new Date(verif.expires_at) < new Date()) return res.status(400).json({ error: 'Code abgelaufen – bitte neu anfordern' });
+        if (verif.attempts >= 5) return res.status(429).json({ error: 'Zu viele Fehlversuche – bitte neu anfordern' });
+
+        const match = await bcrypt.compare(code, verif.code_hash);
+        if (!match) {
+            await pool.query('UPDATE eeg_email_verifications SET attempts = attempts + 1 WHERE id = ?', [verif.id]);
+            return res.status(400).json({ error: 'Code falsch', remaining: 4 - verif.attempts });
+        }
+
+        await pool.query('UPDATE eeg_email_verifications SET verified = 1 WHERE id = ?', [verif.id]);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('[EMAIL-VERIFY] Check (no-app):', err.message);
+        res.status(500).json({ error: 'Serverfehler' });
+    }
+});
+
 module.exports = router;

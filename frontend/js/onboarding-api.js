@@ -98,21 +98,22 @@ const OnboardingAPI = {
         return res.json();
     },
 
-    // E-Mail-Verifikation
+    // E-Mail-Verifikation (unabhängig von Application-ID)
     async sendVerificationCode(email) {
-        const res = await fetch(`/api/email-verify/${this.applicationId}/send`, {
+        const eegConfig = JSON.parse(localStorage.getItem('eeg_config') || '{}');
+        const res = await fetch('/api/email-verify/send', {
             method: 'POST',
-            headers: this.headers(),
-            body: JSON.stringify({ email })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, eeg_id: eegConfig.id || null })
         });
         return res.json();
     },
 
-    async checkVerificationCode(code) {
-        const res = await fetch(`/api/email-verify/${this.applicationId}/check`, {
+    async checkVerificationCode(code, email) {
+        const res = await fetch('/api/email-verify/check', {
             method: 'POST',
-            headers: this.headers(),
-            body: JSON.stringify({ code })
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, code })
         });
         return res.json();
     },
