@@ -35,55 +35,71 @@ Wenn ein Feld nicht im Dokument zu finden ist, setze es auf null.
 Antworte NUR mit dem JSON-Objekt, sonst nichts.`;
 
 // Gemini Flash via Google AI API — versucht mehrere Modelle der Reihe nach
-const GEMINI_MODELS = [
+// Erst verfügbares Modell ermitteln und cachen
+let GEMINI_MODEL_CACHE = null;
+const GEMINI_MODELS_TO_TRY = [
     'gemini-2.5-flash-preview-04-17',
     'gemini-2.5-flash',
-    'gemini-2.5-pro',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
-    'gemini-1.5-pro',
 ];
+
+async function fetchWithTimeout(url, options, timeoutMs = 25000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+        return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+        clearTimeout(timer);
+    }
+}
 
 async function ocrWithGemini(base64, mediaType, apiKey) {
     const part = { inlineData: { mimeType: mediaType, data: base64 } };
-
     const body = {
-        contents: [{
-            parts: [ part, { text: EXTRACTION_PROMPT } ]
-        }],
+        contents: [{ parts: [part, { text: EXTRACTION_PROMPT }] }],
         generationConfig: { maxOutputTokens: 1024 }
     };
 
+    // Gecachtes Modell zuerst versuchen
+    const models = GEMINI_MODEL_CACHE
+        ? [GEMINI_MODEL_CACHE, ...GEMINI_MODELS_TO_TRY.filter(m => m !== GEMINI_MODEL_CACHE)]
+        : GEMINI_MODELS_TO_TRY;
+
     let lastError;
-    for (const model of GEMINI_MODELS) {
+    for (const model of models) {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
         try {
-            const resp = await fetch(url, {
+            const resp = await fetchWithTimeout(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)
-            });
+            }, 25000);
 
-            if (resp.status === 404) {
-                console.warn(`[OCR] Gemini Modell ${model} nicht gefunden, probiere nächstes...`);
-                lastError = new Error(`Gemini API 404 (${model})`);
+            if (resp.status === 404 || resp.status === 400) {
+                const msg = await resp.text();
+                console.warn(`[OCR] Gemini ${model} nicht verfügbar (${resp.status}), nächstes...`);
+                if (GEMINI_MODEL_CACHE === model) GEMINI_MODEL_CACHE = null;
+                lastError = new Error(`Gemini ${resp.status} (${model})`);
                 continue;
             }
 
             if (!resp.ok) {
                 const errText = await resp.text();
-                console.error(`[OCR] Gemini ${model} Fehler:`, resp.status, errText);
+                console.error(`[OCR] Gemini ${model} Fehler:`, resp.status, errText.slice(0, 200));
                 lastError = new Error(`Gemini API ${resp.status}`);
                 continue;
             }
 
             const data = await resp.json();
             const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-            console.log(`[OCR] Gemini Modell ${model} erfolgreich`);
+            GEMINI_MODEL_CACHE = model; // Erfolgreiches Modell merken
+            console.log(`[OCR] Gemini ${model} erfolgreich`);
             return text;
         } catch (e) {
             lastError = e;
             console.warn(`[OCR] Gemini ${model} Exception:`, e.message);
+            if (e.name === 'AbortError') continue; // Timeout → nächstes Modell
         }
     }
     throw lastError || new Error('Alle Gemini-Modelle fehlgeschlagen');

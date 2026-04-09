@@ -134,7 +134,13 @@ const Autofill = {
             method: 'POST',
             body: fd
         });
-        return res.json();
+        const text = await res.text();
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error('[OCR] Keine JSON-Antwort:', text.slice(0, 200));
+            return { error: 'Server-Fehler (Status ' + res.status + ') – bitte nochmal versuchen' };
+        }
     },
 
     // Setup OCR-Upload-Button
