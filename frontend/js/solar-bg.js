@@ -130,8 +130,10 @@
                 ? `rgba(100, 180, 255, ${alpha})`
                 : `rgba(255, 200, 80, ${alpha})`;
 
+            const radius = Math.max(0, this.size * this.life);
+            if (radius <= 0) return;
             ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2);
+            ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
             ctx.fillStyle = color;
 
             // Glow-Effekt
@@ -225,7 +227,7 @@
         panels.forEach(p => { p.update(wavePos); p.draw(); });
 
         // Partikel
-        particles = particles.filter(p => p.life > 0);
+        particles = particles.filter(p => p.life > 0.01);
         particles.forEach(p => { p.update(); p.draw(); });
 
         // Dünner Lichtstrahl entlang der Welle
