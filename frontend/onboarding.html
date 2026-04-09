@@ -283,36 +283,60 @@
                 <p class="step-subtitle">Bitte stelle uns folgende Unterlage(n) bereit, damit wir deine Teilnahme an unserer EEG besser kalkulieren können:</p>
 
                 <div class="upload-section">
-                    <h3>Rechnung eines Verbraucherzählpunktes (Monats- oder Jahresabrechnung) *</h3>
-                    <div class="upload-area" data-kategorie="rechnung_verbrauch">
-                        <p>Datei zur Übermittlung hier ablegen oder klicken um eine Datei auszuwählen</p>
+                    <div class="upload-section-header">
+                        <div class="upload-section-icon">🧾</div>
+                        <div class="upload-section-meta">
+                            <h3>Stromrechnung (Verbrauch) <span class="upload-required-badge">Pflicht</span></h3>
+                            <p class="upload-hint">Monats- oder Jahresabrechnung eines Verbrauchszählpunktes – wird zur Prüfung deiner Zählpunktnummer benötigt.</p>
+                        </div>
+                    </div>
+                    <div class="upload-area" data-kategorie="rechnung_verbrauch" data-required="true">
+                        <p>Datei hier ablegen oder klicken zum Auswählen</p>
                         <input type="file" accept="image/*,application/pdf" class="upload-input">
                         <div class="upload-preview"></div>
                     </div>
                 </div>
 
                 <div class="upload-section">
-                    <h3>Gutschrift eines Lieferzählpunktes (falls vorhanden. Monats- oder Jahresabrechnung möglich)</h3>
+                    <div class="upload-section-header">
+                        <div class="upload-section-icon">☀️</div>
+                        <div class="upload-section-meta">
+                            <h3>Einspeisegutschrift <span class="upload-optional-badge">Optional</span></h3>
+                            <p class="upload-hint">Nur falls du selbst Energie einspeist – Monats- oder Jahresgutschrift eines Lieferzählpunktes.</p>
+                        </div>
+                    </div>
                     <div class="upload-area" data-kategorie="gutschrift_einspeisung">
-                        <p>Datei zur Übermittlung hier ablegen oder klicken um eine Datei auszuwählen</p>
+                        <p>Datei hier ablegen oder klicken zum Auswählen</p>
                         <input type="file" accept="image/*,application/pdf" class="upload-input">
                         <div class="upload-preview"></div>
                     </div>
                 </div>
 
                 <div class="upload-section">
-                    <h3>Scan eines gültigen Lichtbildausweises (Reisepass, Personalausweis, Führerschein) *</h3>
-                    <div class="upload-area" data-kategorie="lichtbildausweis">
-                        <p>Datei zur Übermittlung hier ablegen oder klicken um eine Datei auszuwählen</p>
+                    <div class="upload-section-header">
+                        <div class="upload-section-icon">🪪</div>
+                        <div class="upload-section-meta">
+                            <h3>Lichtbildausweis <span class="upload-required-badge">Pflicht</span></h3>
+                            <p class="upload-hint">Reisepass, Personalausweis oder Führerschein – Vorder- und Rückseite als ein Bild oder PDF.</p>
+                        </div>
+                    </div>
+                    <div class="upload-area" data-kategorie="lichtbildausweis" data-required="true">
+                        <p>Datei hier ablegen oder klicken zum Auswählen</p>
                         <input type="file" accept="image/*,application/pdf" class="upload-input">
                         <div class="upload-preview"></div>
                     </div>
                 </div>
 
                 <div class="upload-section">
-                    <h3>Foto eines (oder mehrerer) Zähler - bitte beachte, dass die INV.Nr. gut sichtbar ist.</h3>
+                    <div class="upload-section-header">
+                        <div class="upload-section-icon">⚡</div>
+                        <div class="upload-section-meta">
+                            <h3>Foto des Stromzählers <span class="upload-optional-badge">Optional</span></h3>
+                            <p class="upload-hint">Bitte achte darauf, dass die <strong>Inventarnummer (INV.Nr.)</strong> gut lesbar ist – erleichtert die Zuordnung erheblich.</p>
+                        </div>
+                    </div>
                     <div class="upload-area" data-kategorie="zaehler_foto">
-                        <p>Datei zur Übermittlung hier ablegen oder klicken um eine Datei auszuwählen</p>
+                        <p>Datei hier ablegen oder klicken zum Auswählen</p>
                         <input type="file" accept="image/*,application/pdf" multiple class="upload-input">
                         <div class="upload-preview"></div>
                     </div>

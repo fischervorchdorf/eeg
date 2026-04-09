@@ -352,7 +352,32 @@
                     if (result.error) { if (await safeError(result)) return; alert(result.error); btnNext.disabled = false; return; }
                     break;
                 }
-                case 6: break; // Dokumente - werden inline hochgeladen
+                case 6: { // Dokumente - Pflichtdokumente prüfen
+                    const requiredAreas = document.querySelectorAll('.upload-area[data-required="true"]');
+                    const missing = [...requiredAreas].filter(a => !a.classList.contains('uploaded'));
+                    if (missing.length > 0) {
+                        // Fehlende Bereiche visuell hervorheben
+                        missing.forEach(area => {
+                            const section = area.closest('.upload-section');
+                            if (section) {
+                                section.classList.add('upload-required-missing');
+                                setTimeout(() => section.classList.remove('upload-required-missing'), 3000);
+                            }
+                        });
+                        const names = missing.map(a => {
+                            const section = a.closest('.upload-section');
+                            const h3 = section?.querySelector('.upload-section-meta h3');
+                            // Strip the badge text (Pflicht/Optional) from the h3
+                            const clone = h3?.cloneNode(true);
+                            clone?.querySelectorAll('span')?.forEach(s => s.remove());
+                            return clone?.textContent?.trim() || a.dataset.kategorie;
+                        });
+                        alert(`Bitte lade folgende Pflichtdokumente hoch:\n• ${names.join('\n• ')}`);
+                        btnNext.disabled = false;
+                        return;
+                    }
+                    break;
+                }
 
                 case 7: { // Zahlung
                     const data = collectPaymentData();
