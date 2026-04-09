@@ -36,10 +36,10 @@ Antworte NUR mit dem JSON-Objekt, sonst nichts.`;
 
 // Gemini Flash via Google AI API — versucht mehrere Modelle der Reihe nach
 // Erst verfügbares Modell ermitteln und cachen
-let GEMINI_MODEL_CACHE = null;
+let GEMINI_MODEL_CACHE = 'gemini-2.5-flash'; // Direkt mit dem bekannt funktionierenden starten
 const GEMINI_MODELS_TO_TRY = [
-    'gemini-2.5-flash-preview-04-17',
     'gemini-2.5-flash',
+    'gemini-2.5-flash-preview-04-17',
     'gemini-1.5-flash',
     'gemini-1.5-flash-latest',
 ];
@@ -184,13 +184,10 @@ router.post('/stromrechnung', upload.single('file'), async (req, res) => {
             text = await ocrWithClaude(base64, mediaType, claudeKey);
         }
 
-        // Markdown-Codeblock entfernen falls vorhanden (```json ... ```)
-        const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-
-        // JSON aus Antwort extrahieren
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        // JSON-Objekt direkt aus der Antwort extrahieren (robust gegen Markdown, Anführungszeichen etc.)
+        const jsonMatch = text.match(/\{[\s\S]*\}/);
         if (!jsonMatch) {
-            console.error('[OCR] Kein JSON in Antwort:', text.slice(0, 200));
+            console.error('[OCR] Kein JSON in Antwort:', text.slice(0, 300));
             return res.status(502).json({ error: 'OCR konnte keine Felder extrahieren' });
         }
 
