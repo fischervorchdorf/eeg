@@ -12,7 +12,7 @@ const { validateEmail } = require('../utils/validators');
 
 // Passphrase-Auth (gleich wie in onboarding.js)
 async function requirePassphrase(req, res, next) {
-    const passphrase = req.headers['x-passphrase'] || req.query.passphrase;
+    const passphrase = req.headers['x-passphrase'];
     const appId = parseInt(req.params.id);
 
     if (!passphrase || !appId) {
@@ -54,7 +54,7 @@ router.post('/:id/send', requirePassphrase, async (req, res) => {
 
         // 6-stelligen Code generieren
         const code = crypto.randomInt(100000, 999999).toString();
-        const codeHash = await bcrypt.hash(code, 10);
+        const codeHash = await bcrypt.hash(code, 12);
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 min
 
         // Alte unverifizierte Codes loeschen
@@ -91,7 +91,7 @@ router.post('/:id/send', requirePassphrase, async (req, res) => {
         res.json({
             success: true,
             message: 'Bestaetigungscode wurde gesendet',
-            dev_code: result.dev ? code : undefined  // Nur im Dev-Modus den Code zurueckgeben
+            dev_code: (result.dev && process.env.NODE_ENV !== 'production') ? code : undefined  // Nur im Dev-Modus den Code zurueckgeben
         });
     } catch (err) {
         console.error('[EMAIL-VERIFY] Send:', err.message);
@@ -176,18 +176,23 @@ router.post('/send', async (req, res) => {
             if (tenants[0]) eegName = tenants[0].name;
         }
 
-        // Code in Session speichern (einfach in DB ohne application_id = 0)
-        const codeHash = await bcrypt.hash(code, 8);
+        // Code in DB speichern (ohne application_id)
+        const codeHash = await bcrypt.hash(code, 12);
         const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+        // Alte unverifizierte Codes fuer diese Email loeschen
+        await pool.query(
+            'DELETE FROM eeg_email_verifications WHERE application_id IS NULL AND email = ? AND verified = 0',
+            [email]
+        );
 
         await pool.query(
             `INSERT INTO eeg_email_verifications (application_id, email, code_hash, expires_at)
-             VALUES (0, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE code_hash = VALUES(code_hash), expires_at = VALUES(expires_at), verified = 0, attempts = 0`,
+             VALUES (NULL, ?, ?, ?)`,
             [email, codeHash, expiresAt]
         );
 
-        const { text, html } = renderVerificationEmail({ code, eegName, applicationId: 0 });
+        const { text, html } = renderVerificationEmail({ code, eegName, applicationId: null });
         const result = await sendMail({
             to: email,
             subject: `${eegName} – Dein Bestätigungscode`,
@@ -201,7 +206,7 @@ router.post('/send', async (req, res) => {
         res.json({
             success: true,
             message: 'Bestätigungscode wurde gesendet',
-            dev_code: result.dev ? code : undefined
+            dev_code: (result.dev && process.env.NODE_ENV !== 'production') ? code : undefined
         });
     } catch (err) {
         console.error('[EMAIL-VERIFY] Send (no-app):', err.message);
@@ -218,7 +223,7 @@ router.post('/check', async (req, res) => {
 
         const [verifs] = await pool.query(
             `SELECT id, code_hash, attempts, expires_at FROM eeg_email_verifications
-             WHERE application_id = 0 AND email = ? AND verified = 0
+             WHERE application_id IS NULL AND email = ? AND verified = 0
              ORDER BY id DESC LIMIT 1`,
             [email]
         );

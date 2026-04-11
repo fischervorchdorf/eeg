@@ -10,7 +10,9 @@ router.use(requireEegAccess);
 // GET /api/admin/members - Aktive Mitglieder
 router.get('/', requirePermission('mitglieder'), async (req, res) => {
     try {
-        const { search, limit = 100, offset = 0 } = req.query;
+        const { search } = req.query;
+        const limit = Math.min(parseInt(req.query.limit) || 100, 200);
+        const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
         let where = "WHERE a.status IN ('genehmigt','aktiv') AND a.geloescht_am IS NULL";
         const params = [];
@@ -40,7 +42,7 @@ router.get('/', requirePermission('mitglieder'), async (req, res) => {
              GROUP BY a.id
              ORDER BY a.nachname, a.vorname
              LIMIT ? OFFSET ?`,
-            [...params, parseInt(limit), parseInt(offset)]
+            [...params, limit, offset]
         );
 
         res.json({ members });
@@ -81,6 +83,14 @@ router.get('/:id', requirePermission('mitglieder'), async (req, res) => {
 // POST /api/admin/members/:id/kuendigung
 router.post('/:id/kuendigung', requirePermission('mitglieder'), async (req, res) => {
     try {
+        // EEG-Scoping: pruefen ob Mitglied zur eigenen EEG gehoert
+        if (req.eegId) {
+            const [check] = await pool.query('SELECT eeg_id FROM eeg_applications WHERE id = ?', [req.params.id]);
+            if (!check.length || check[0].eeg_id !== req.eegId) {
+                return res.status(403).json({ error: 'Kein Zugriff auf dieses Mitglied' });
+            }
+        }
+
         const { grund } = req.body;
 
         await pool.query(

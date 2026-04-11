@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
+const sanitizeHtml = require('sanitize-html');
 const pool = require('../config/db');
 const { requireLogin, requirePermission } = require('../middleware/requireLogin');
 const { requireEegAccess } = require('../middleware/requireEegAccess');
@@ -125,11 +126,23 @@ router.put('/email-templates/:key', requirePermission('einstellungen'), async (r
     try {
         const { betreff, inhalt_html } = req.body;
 
+        // HTML sanitizen gegen Stored XSS
+        const cleanHtml = sanitizeHtml(inhalt_html || '', {
+            allowedTags: ['p', 'br', 'strong', 'em', 'b', 'i', 'u', 'a', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'span', 'div', 'table', 'tr', 'td', 'th', 'thead', 'tbody'],
+            allowedAttributes: {
+                'a': ['href', 'target'],
+                'span': ['style'],
+                'td': ['style'],
+                'th': ['style']
+            },
+            allowedSchemes: ['https', 'mailto']
+        });
+
         await pool.query(
             `INSERT INTO eeg_email_templates (eeg_id, template_key, betreff, inhalt_html)
              VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE betreff = VALUES(betreff), inhalt_html = VALUES(inhalt_html)`,
-            [req.eegId, req.params.key, betreff, inhalt_html]
+            [req.eegId, req.params.key, betreff, cleanHtml]
         );
 
         res.json({ success: true });

@@ -202,7 +202,7 @@ router.post('/stromrechnung', upload.single('file'), async (req, res) => {
         res.json({ success: true, extracted });
     } catch (err) {
         console.error('[OCR] Fehler:', err.message, err.stack);
-        res.status(500).json({ error: 'OCR-Service Fehler: ' + err.message });
+        res.status(500).json({ error: 'OCR-Service Fehler. Bitte spaeter erneut versuchen.' });
     }
 });
 

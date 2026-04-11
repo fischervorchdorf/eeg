@@ -20,11 +20,11 @@ const upload = multer({
 
 // Passphrase-Auth Middleware fuer Antragsteller
 async function requirePassphrase(req, res, next) {
-    const passphrase = req.headers['x-passphrase'] || req.query.passphrase;
+    const passphrase = req.headers['x-passphrase'];
     const appId = parseInt(req.params.id);
 
     if (!passphrase || !appId) {
-        return res.status(401).json({ error: 'Passphrase erforderlich' });
+        return res.status(401).json({ error: 'Passphrase erforderlich (x-passphrase Header)' });
     }
 
     const [apps] = await pool.query('SELECT id, passphrase_hash, eeg_id FROM eeg_applications WHERE id = ?', [appId]);
@@ -109,7 +109,7 @@ router.post('/start', async (req, res) => {
 
         // Passphrase generieren
         const passphrase = generatePassphrase(5);
-        const hash = await bcrypt.hash(passphrase, 10);
+        const hash = await bcrypt.hash(passphrase, 12);
 
         const [result] = await pool.query(
             'INSERT INTO eeg_applications (eeg_id, member_type_id, passphrase_hash, current_step) VALUES (?, ?, ?, 1)',
@@ -496,11 +496,20 @@ router.get('/:id/resume', requirePassphrase, async (req, res) => {
             [req.params.id]
         );
 
-        // Dokumente laden
-        const [documents] = await pool.query(
-            'SELECT id, kategorie, original_name, s3_url, local_path, mime_type, file_size FROM eeg_documents WHERE application_id = ?',
+        // Dokumente laden (mit Signed URLs statt direkter S3-URL)
+        const { getDocumentUrl } = require('../utils/s3-client');
+        const [rawDocs] = await pool.query(
+            'SELECT id, kategorie, original_name, s3_key, local_path, mime_type, file_size FROM eeg_documents WHERE application_id = ?',
             [req.params.id]
         );
+        const documents = await Promise.all(rawDocs.map(async (doc) => ({
+            id: doc.id,
+            kategorie: doc.kategorie,
+            original_name: doc.original_name,
+            url: await getDocumentUrl(doc.s3_key, doc.local_path),
+            mime_type: doc.mime_type,
+            file_size: doc.file_size
+        })));
 
         // Energiespeicher laden
         const [speicher] = await pool.query(
@@ -557,7 +566,7 @@ router.get('/default-eeg', async (req, res) => {
 // HEAD /api/onboarding/:id/exists - Leichtgewichtiger Existenz-Check (Stale-Session)
 router.get('/:id/exists', async (req, res) => {
     try {
-        const passphrase = req.headers['x-passphrase'] || req.query.passphrase;
+        const passphrase = req.headers['x-passphrase'];
         if (!passphrase) return res.status(401).json({ exists: false });
 
         const [apps] = await pool.query(

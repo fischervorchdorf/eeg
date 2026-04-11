@@ -10,7 +10,9 @@ router.use(requireEegAccess);
 // GET /api/admin/applications - Alle Antrage auflisten
 router.get('/', requirePermission('antraege'), async (req, res) => {
     try {
-        const { status, search, member_type, limit = 50, offset = 0 } = req.query;
+        const { status, search, member_type } = req.query;
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        const offset = Math.max(parseInt(req.query.offset) || 0, 0);
 
         let where = 'WHERE a.geloescht_am IS NULL';
         const params = [];
@@ -49,7 +51,7 @@ router.get('/', requirePermission('antraege'), async (req, res) => {
              ${where}
              ORDER BY a.created_at DESC
              LIMIT ? OFFSET ?`,
-            [...params, parseInt(limit), parseInt(offset)]
+            [...params, limit, offset]
         );
 
         const [countResult] = await pool.query(
@@ -152,6 +154,13 @@ router.patch('/:id/status', requirePermission('antraege'), async (req, res) => {
 // PUT /api/admin/applications/:id/notiz - Admin-Notiz
 router.put('/:id/notiz', requirePermission('antraege'), async (req, res) => {
     try {
+        // EEG-Scoping: pruefen ob Antrag zur eigenen EEG gehoert
+        if (req.eegId) {
+            const [check] = await pool.query('SELECT eeg_id FROM eeg_applications WHERE id = ?', [req.params.id]);
+            if (!check.length || check[0].eeg_id !== req.eegId) {
+                return res.status(403).json({ error: 'Kein Zugriff auf diesen Antrag' });
+            }
+        }
         await pool.query(
             'UPDATE eeg_applications SET admin_notiz = ? WHERE id = ?',
             [req.body.admin_notiz || '', req.params.id]

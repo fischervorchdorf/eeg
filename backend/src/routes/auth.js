@@ -32,13 +32,14 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Ungültige Anmeldedaten' });
         }
 
-        // Session erstellen (8 Stunden)
+        // Session erstellen (8 Stunden) - Token gehasht in DB speichern
         const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
         const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
         await pool.query(
             'INSERT INTO eeg_admin_sessions (user_id, token, ip_adresse, user_agent, laeuft_ab) VALUES (?, ?, ?, ?, ?)',
-            [user.id, token, req.ip, req.headers['user-agent'] || '', expiresAt]
+            [user.id, tokenHash, req.ip, req.headers['user-agent'] || '', expiresAt]
         );
 
         // Letzter Login aktualisieren
@@ -78,7 +79,8 @@ router.post('/login', async (req, res) => {
 router.post('/logout', async (req, res) => {
     const token = req.cookies?.eeg_admin_session;
     if (token) {
-        await pool.query('DELETE FROM eeg_admin_sessions WHERE token = ?', [token]).catch(() => {});
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        await pool.query('DELETE FROM eeg_admin_sessions WHERE token = ?', [tokenHash]).catch(() => {});
     }
     res.clearCookie('eeg_admin_session');
     res.json({ success: true });

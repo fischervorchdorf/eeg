@@ -194,7 +194,7 @@ router.post('/preview', requirePermission('mitglieder'), upload.single('file'), 
         });
     } catch (err) {
         console.error('[IMPORT] Preview:', err.message);
-        res.status(500).json({ error: 'Datei konnte nicht verarbeitet werden: ' + err.message });
+        res.status(500).json({ error: 'Datei konnte nicht verarbeitet werden. Bitte Format pruefen.' });
     }
 });
 

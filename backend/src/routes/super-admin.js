@@ -160,6 +160,8 @@ router.put('/users/:id', async (req, res) => {
                 'UPDATE eeg_admin_users SET email=?, password_hash=?, rolle=?, berechtigungen=?, aktiv=? WHERE id=?',
                 [email, hash, rolle || 'eeg_admin', JSON.stringify(berechtigungen || {}), aktiv !== undefined ? aktiv : 1, uid]
             );
+            // Alle bestehenden Sessions invalidieren bei Passwort-Aenderung
+            await pool.query('DELETE FROM eeg_admin_sessions WHERE user_id = ?', [uid]);
         } else {
             await pool.query(
                 'UPDATE eeg_admin_users SET email=?, rolle=?, berechtigungen=?, aktiv=? WHERE id=?',
@@ -197,7 +199,8 @@ router.delete('/users/:id', async (req, res) => {
 // GET /api/super-admin/audit-log
 router.get('/audit-log', async (req, res) => {
     try {
-        const { eeg_id, limit = 100 } = req.query;
+        const { eeg_id } = req.query;
+        const limit = Math.min(parseInt(req.query.limit) || 100, 200);
         let where = '';
         const params = [];
 
@@ -207,7 +210,7 @@ router.get('/audit-log', async (req, res) => {
             `SELECT l.*, u.username FROM eeg_audit_log l
              LEFT JOIN eeg_admin_users u ON u.id = l.user_id
              ${where} ORDER BY l.created_at DESC LIMIT ?`,
-            [...params, parseInt(limit)]
+            [...params, limit]
         );
         res.json(logs);
     } catch (err) {

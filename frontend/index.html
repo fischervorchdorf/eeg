@@ -98,38 +98,40 @@
             }
         }
 
+        function applyEegBranding(eeg) {
+            if (eeg.error || !eeg.id) return false;
+            document.getElementById('eegName').textContent = eeg.name;
+            document.getElementById('eegSitz').textContent = eeg.sitz || '';
+            document.title = `${eeg.name} - Onboarding`;
+
+            if (eeg.logo_url) {
+                const logo = document.getElementById('eegLogo');
+                logo.src = eeg.logo_url;
+                logo.alt = eeg.name;
+                logo.style.display = 'block';
+            }
+
+            if (eeg.farbe_primary) document.documentElement.style.setProperty('--primary', eeg.farbe_primary);
+            if (eeg.farbe_secondary) document.documentElement.style.setProperty('--secondary', eeg.farbe_secondary);
+            if (eeg.background_url) document.body.style.backgroundImage = `url(${eeg.background_url})`;
+
+            document.getElementById('btnJoin').href = `/onboarding?eeg=${eeg.slug}`;
+            localStorage.setItem('eeg_config', JSON.stringify(eeg));
+
+            document.getElementById('impName').textContent = eeg.name;
+            document.getElementById('impSitz').textContent = eeg.sitz || '-';
+            document.getElementById('impZvr').textContent = eeg.zvr_nummer ? 'ZVR ' + eeg.zvr_nummer : '-';
+            document.getElementById('impKontakt').textContent = eeg.kontakt_email || '-';
+            return true;
+        }
+
         if (eegSlug) {
             fetch(`/api/onboarding/eeg/${eegSlug}`)
-                .then(r => r.json())
+                .then(r => r.ok ? r.json() : null)
                 .then(eeg => {
-                    if (eeg.error) return;
-                    document.getElementById('eegName').textContent = eeg.name;
-                    document.getElementById('eegSitz').textContent = eeg.sitz || '';
-                    document.title = `${eeg.name} - Onboarding`;
-
-                    if (eeg.logo_url) {
-                        const logo = document.getElementById('eegLogo');
-                        logo.src = eeg.logo_url;
-                        logo.alt = eeg.name;
-                        logo.style.display = 'block';
-                    }
-
-                    // Branding-Farben anwenden
-                    if (eeg.farbe_primary) document.documentElement.style.setProperty('--primary', eeg.farbe_primary);
-                    if (eeg.farbe_secondary) document.documentElement.style.setProperty('--secondary', eeg.farbe_secondary);
-                    if (eeg.background_url) document.body.style.backgroundImage = `url(${eeg.background_url})`;
-
-                    // EEG-ID in Links weitergeben
-                    document.getElementById('btnJoin').href = `/onboarding?eeg=${eegSlug}`;
-
-                    // In localStorage speichern
-                    localStorage.setItem('eeg_config', JSON.stringify(eeg));
-
-                    // Impressum befüllen
-                    document.getElementById('impName').textContent = eeg.name;
-                    document.getElementById('impSitz').textContent = eeg.sitz || '-';
-                    document.getElementById('impZvr').textContent = eeg.zvr_nummer ? 'ZVR ' + eeg.zvr_nummer : '-';
-                    document.getElementById('impKontakt').textContent = eeg.kontakt_email || '-';
+                    if (eeg && applyEegBranding(eeg)) return;
+                    // Slug nicht gefunden — Fallback auf Default-EEG
+                    return fetch('/api/onboarding/default-eeg').then(r => r.json()).then(applyEegBranding);
                 })
                 .catch(() => {});
         }

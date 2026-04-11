@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const pool = require('../config/db');
 
 async function requireLogin(req, res, next) {
@@ -10,13 +11,14 @@ async function requireLogin(req, res, next) {
     }
 
     try {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
         const [sessions] = await pool.query(
             `SELECT s.id, s.user_id, s.laeuft_ab,
                     u.username, u.email, u.rolle, u.eeg_id, u.berechtigungen, u.aktiv
              FROM eeg_admin_sessions s
              JOIN eeg_admin_users u ON s.user_id = u.id
              WHERE s.token = ? AND s.laeuft_ab > NOW() LIMIT 1`,
-            [token]
+            [tokenHash]
         );
 
         if (sessions.length === 0) {
